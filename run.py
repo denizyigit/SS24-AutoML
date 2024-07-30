@@ -11,20 +11,21 @@ from __future__ import annotations
 from pathlib import Path
 from sklearn.metrics import accuracy_score
 import numpy as np
-from automl.automl import AutoML
+from src.automl.automl import AutoML
 import argparse
 
 import logging
 
-from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
+from src.automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
 
 logger = logging.getLogger(__name__)
 
 
 def main(
-    dataset: str,
-    output_path: Path,
-    seed: int,
+        dataset: str,
+        output_path: Path,
+        seed: int,
+        reduced_dataset_ratio: float = 1.0,
 ):
     match dataset:
         case "fashion":
@@ -42,7 +43,7 @@ def main(
     # an example of how your automl system could be used.
     # As a general rule of thumb, you should **never** pass in any
     # test data to your AutoML solution other than to generate predictions.
-    automl = AutoML(seed=seed)
+    automl = AutoML(seed=seed, reduced_dataset_ratio=reduced_dataset_ratio)
     # load the dataset and create a loader then pass it
     automl.fit(dataset_class)
     # Do the same for the test dataset
@@ -57,14 +58,13 @@ def main(
 
     # check if test_labels has missing data
 
-
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
+        print(f"test labels length: {len(test_labels)}")
         logger.info(f"Accuracy on test set: {acc}")
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         logger.info(f"No test split for dataset '{dataset}'")
-
 
 
 if __name__ == "__main__":
@@ -95,6 +95,16 @@ if __name__ == "__main__":
             " i.e. torch, numpy, pandas, sklearn, etc."
         )
     )
+
+    parser.add_argument(
+        "--reduced-dataset-ratio",
+        type=float,
+        default=1.0,
+        help=(
+            "Ratio of the dataset to use for training."
+        )
+    )
+
     parser.add_argument(
         "--quiet",
         action="store_true",
@@ -117,4 +127,6 @@ if __name__ == "__main__":
         dataset=args.dataset,
         output_path=args.output_path,
         seed=args.seed,
+        reduced_dataset_ratio=args.reduced_dataset_ratio,
+
     )

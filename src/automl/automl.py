@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Tuple
 
+import neps
 import torch
 import random
 import numpy as np
@@ -16,73 +17,107 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from automl.dummy_model import DummyNN
-from automl.utils import calculate_mean_std
-
+from src.automl.dummy_model import DummyNN, resNet18_Pretrained
+from src.automl.utils import calculate_mean_std, create_reduced_dataset
 
 logger = logging.getLogger(__name__)
 
 
 class AutoML:
 
-    def __init__(
-        self,
-        seed: int,
-    ) -> None:
+    def __init__(self, seed: int, reduced_dataset_ratio: float = 1.0) -> None:
         self.seed = seed
         self._model: nn.Module | None = None
+        self._transform = None
+        self.reduced_dataset_ratio = float(reduced_dataset_ratio)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def fit(
-        self,
-        dataset_class: Any,
-    ) -> AutoML:
+    def fit(self, dataset_class: Any, ) -> AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
-        # set seed for pytorch training
-        random.seed(self.seed)
-        np.random.seed(self.seed)
-        torch.manual_seed(self.seed)
-        torch.cuda.manual_seed(self.seed)
-
-        # Ensure deterministic behavior in CuDNN
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
-        self._transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(*calculate_mean_std(dataset_class)),
-            ]
+        pipeline_space = dict(
+            batch_size=neps.IntegerParameter(lower=1, upper=100, log=True),
+            learning_rate=neps.FloatParameter(lower=1e-6, upper=1e-1, log=True),
+            epochs=neps.IntegerParameter(lower=1, upper=20),
+            optimizer=neps.CategoricalParameter(["adam", "sgd"]),
         )
-        dataset = dataset_class(
-            root="./data",
-            split='train',
-            download=True,
-            transform=self._transform
+
+        root_directory = f"results_{dataset_class.__name__}"
+
+        def run_pipeline(**config):
+            random.seed(self.seed)
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            torch.cuda.manual_seed(self.seed)
+            # Ensure deterministic behavior in CuDNN
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+            print(f"Cuda available: {torch.cuda.is_available()}")
+            print(f"Training on dataset: {dataset_class.__name__}, type: {dataset_class.__class__})")
+            print(f"Reduced dataset ratio: {self.reduced_dataset_ratio} is used for faster training.")
+
+            mean, std = calculate_mean_std(dataset_class, ratio=self.reduced_dataset_ratio)
+
+            self._transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=mean, std=std),
+                ]
+            )
+
+            full_dataset = dataset_class(
+                root="./data",
+                split='train',
+                download=True,
+                transform=self._transform
+            )
+
+            reduced_dataset = create_reduced_dataset(full_dataset, self.reduced_dataset_ratio)
+
+            train_loader = DataLoader(reduced_dataset, batch_size=64, shuffle=True)
+
+            input_size = dataset_class.width * dataset_class.height * dataset_class.channels
+
+            model = resNet18_Pretrained(num_classes=dataset_class.num_classes,
+                                        number_of_channels=dataset_class.channels)
+            model.to(self.device)
+
+            criterion = nn.CrossEntropyLoss()
+
+            if config["optimizer"] == "adam":
+                optimizer = optim.Adam(model.parameters(), lr=config["learning_rate"])
+            else:
+                optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
+
+            model.train()
+
+            for epoch in range(config["epochs"]):
+                loss_per_batch = []
+                for a, (data, target) in enumerate(train_loader):
+                    data, target = data.to(self.device), target.to(self.device)
+                    optimizer.zero_grad()
+                    output = model(data)
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+                    loss_per_batch.append(loss.item())
+                mean_loss = np.mean(loss_per_batch)
+                logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
+            model.eval()
+            self._model = model
+
+            return mean_loss
+
+        neps.run(
+            run_pipeline=run_pipeline,
+            pipeline_space=pipeline_space,
+            root_directory=root_directory,
+            max_evaluations_total=10,
+            overwrite_working_directory=True,
+            seed=self.seed,
+            post_run_summary=True,
         )
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
-
-        input_size = dataset_class.width * dataset_class.height * dataset_class.channels
-
-        model = DummyNN(input_size, dataset_class.num_classes)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.003)
-        
-        model.train()
-        for epoch in range(5):
-            loss_per_batch = []
-            for _, (data, target) in enumerate(train_loader):
-                optimizer.zero_grad()
-                output = model(data)
-                loss = criterion(output, target)
-                loss.backward()
-                optimizer.step()
-                loss_per_batch.append(loss.item())
-            logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}")
-        model.eval()
-        self._model = model
-
-        return self
 
     def predict(self, dataset_class) -> Tuple[np.ndarray, np.ndarray]:
         """A reference/toy implementation of a prediction function for the AutoML class.
@@ -99,11 +134,12 @@ class AutoML:
         self._model.eval()
         with torch.no_grad():
             for data, target in data_loader:
+                data, target = data.to(self.device), target.to(self.device)
                 output = self._model(data)
                 predicted = torch.argmax(output, 1)
-                labels.append(target.numpy())
-                predictions.append(predicted.numpy())
+                labels.append(target.to("cpu").numpy())
+                predictions.append(predicted.to("cpu").numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
-        
+
         return predictions, labels
