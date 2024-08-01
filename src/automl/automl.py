@@ -16,8 +16,9 @@ import logging
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from neps.plot.tensorboard_eval import tblogger
 
-from src.automl.dummy_model import DummyNN, resNet18_Pretrained
+from src.automl.dummy_model import *
 from src.automl.utils import calculate_mean_std, create_reduced_dataset
 
 logger = logging.getLogger(__name__)
@@ -79,8 +80,8 @@ class AutoML:
 
             input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
-            model = resNet18_Pretrained(num_classes=dataset_class.num_classes,
-                                        number_of_channels=dataset_class.channels)
+            model = DummyCNN(input_channels=dataset_class.channels,hidden_channels=30, output_channels=dataset_class.num_classes,image_width=dataset_class.width)
+            print(model)
             model.to(self.device)
 
             criterion = nn.CrossEntropyLoss()
@@ -102,22 +103,46 @@ class AutoML:
                     loss.backward()
                     optimizer.step()
                     loss_per_batch.append(loss.item())
+
+
                 mean_loss = np.mean(loss_per_batch)
+
+                tblogger.log(
+                    loss=mean_loss,
+                    current_epoch=epoch,
+                    write_summary_incumbent=True,  # Set to `True` for a live incumbent trajectory.
+                    writer_config_scalar=True,  # Set to `True` for a live loss trajectory for each config.
+                    writer_config_hparam=True,
+                    # Set to `True` for live parallel coordinate, scatter plot matrix, and table view.
+                    # Appending extra data
+
+                )
+
                 logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
             model.eval()
             self._model = model
 
             return mean_loss
 
+
         neps.run(
             run_pipeline=run_pipeline,
             pipeline_space=pipeline_space,
             root_directory=root_directory,
-            max_evaluations_total=10,
+            max_evaluations_total=2,
             overwrite_working_directory=True,
             seed=self.seed,
             post_run_summary=True,
         )
+
+        previous_results, pending_configs = neps.status(root_directory=root_directory)
+
+        # Find the best configuration
+        best_config = min(previous_results, key=lambda x: x["loss"])
+
+        print(best_config)
+
+
 
     def predict(self, dataset_class) -> Tuple[np.ndarray, np.ndarray]:
         """A reference/toy implementation of a prediction function for the AutoML class.
