@@ -2,6 +2,7 @@ ENV_NAME = automl-vision-env
 CONDA_BASE = $(shell conda info --base)
 
 .PHONY: env
+.DEFAULT_GOAL := run
 
 env:
 	@echo "Checking if conda environment '$(ENV_NAME)' exists..."
@@ -28,6 +29,15 @@ install:
 
 run:
 	python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.1
+
+check:
+	pycodestyle --max-line-length=120 src
+	@echo "All good!"
+
+format:
+	@echo "Fixing style issues..."
+	autopep8 --in-place --aggressive --aggressive src/*.py --max-line-length=120
+	@echo "All good!"
 
 SHELL := /bin/bash
 
