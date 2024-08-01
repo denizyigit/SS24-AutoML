@@ -40,7 +40,8 @@ def calculate_mean_std(dataset_class: Any, ratio: float = 0.1):
     loader = DataLoader(reduced_dataset, batch_size=64, shuffle=False)
 
     for images, _ in loader:
-        images.to(torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda"))
+        images.to(torch.device("cpu") if not torch.cuda.is_available()
+                  else torch.device("cuda"))
         batch_samples = images.size(0)
         images = images.view(batch_samples, images.size(1), -1)
         mean += images.mean(2).sum(0)
@@ -51,3 +52,25 @@ def calculate_mean_std(dataset_class: Any, ratio: float = 0.1):
     std /= total_images_count
 
     return mean, std
+
+
+def get_optimizer(config, model):
+    lr = config["learning_rate"]
+    momentum = config["momentum"]
+    weight_decay = config["weight_dec_adam"] if config["optimizer"] == "adam" else config["weight_dec_sgd"]
+
+    if config['optimizer'] == 'Adam':
+        optimizer = torch.optim.Adam(
+            params=model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay
+        )
+    else:
+        optimizer = torch.optim.SGD(
+            params=model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
+            momentum=momentum
+        )
+
+    return optimizer
