@@ -1,6 +1,7 @@
 import random
 from typing import Any, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torchvision.datasets import VisionDataset
@@ -68,9 +69,11 @@ def get_optimizer(config, model):
     return optimizer
 
 
-# Define the training step. Return the validation error and
-# misclassified images.
-def evaluate_loss(model: nn.Module, data_loader: DataLoader) -> float:
+def evaluate_loss(
+    model: nn.Module,
+    data_loader: DataLoader,
+    device: torch.device = torch.device("cpu")
+) -> float:
     # Set the model in evaluation mode (no gradient computation).
     model.eval()
 
@@ -79,15 +82,18 @@ def evaluate_loss(model: nn.Module, data_loader: DataLoader) -> float:
 
     # Disable gradient computation for efficiency.
     with torch.no_grad():
-        for x, y in data_loader:
-            output = model(x)
+        for batch_idx, (data, target) in enumerate(data_loader):
+            data, target = data.to(device), target.to(device)
+            output = model(data)
 
             # Get the predicted class for each input.
-            _, predicted = torch.max(output.data, 1)
-
+            a, predicted = torch.max(output.data, 1)
+            print("_:", a)
+            print("predicted:", predicted)
+            print("y:", target)
             # Update the correct and total counts.
-            correct += (predicted == y).sum().item()
-            total += y.size(0)
+            correct += (predicted == target).sum().item()
+            total += target.size(0)
 
     # Calculate the accuracy and return the error rate.
     accuracy = correct / total
@@ -95,47 +101,62 @@ def evaluate_loss(model: nn.Module, data_loader: DataLoader) -> float:
     return error_rate
 
 
-def training(
+def train_epoch(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
     train_loader: DataLoader,
-    validation_loader: DataLoader,
-) -> Tuple[float, torch.Tensor]:
+    device: torch.device = torch.device("cpu")
+) -> float:
     """
-    Function that trains the model for one epoch and evaluates the model
-    on the validation set.
-
-    Args:
-        model (nn.Module): Model to be trained.
-        optimizer (torch.optim.Optimizer): Optimizer used to train the weights.
-        criterion (nn.Module) : Loss function to use.
-        train_loader (DataLoader): DataLoader containing the training data.
-        validation_loader (DataLoader): DataLoader containing the validation data.
-
-    Returns:
-    Tuple[float, torch.Tensor]: A tuple containing the validation error (float)
-                                and a tensor of misclassified images.
+    Function that trains the model for one epoch returns the mean of the training loss.
     """
-    incorrect_images = []
+    loss_per_batch = []
     model.train()
-
-    for x, y in train_loader:
+    for _, (data, target) in enumerate(train_loader):
+        data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        output = model(x)
-        loss = criterion(output, y)
+        output = model(data)
+        loss = criterion(output, target)
         loss.backward()
         optimizer.step()
+        loss_per_batch.append(loss.item())
 
-        predicted_labels = torch.argmax(output, dim=1)
-        incorrect_mask = predicted_labels != y
-        incorrect_images.append(x[incorrect_mask])
+    mean_loss = np.mean(loss_per_batch)
 
-    # Calculate validation loss using the loss_ev function.
-    validation_loss = evaluate_loss(model, validation_loader)
+    return mean_loss
 
-    # Return the misclassified image by during model training.
-    if len(incorrect_images) > 0:
-        incorrect_images = torch.cat(incorrect_images, dim=0)
 
-    return (validation_loss, incorrect_images)
+def evaluate_validation_epoch(
+    model: nn.Module,
+    criterion: nn.Module,
+    validation_loader: DataLoader,
+    device: torch.device = torch.device("cpu")
+) -> Tuple[float, Any]:
+    """
+    Function that trains the model for one epoch returns the mean of the training loss.
+    """
+    model.eval()
+
+    incorrect_images = []
+
+    with torch.no_grad():
+        validation_loss_per_batch = []
+        for _, (data, target) in enumerate(validation_loader):
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            loss = criterion(output, target)
+            validation_loss_per_batch.append(loss.item())
+
+            # Get the predicted class for each input.
+            predicted_labels = torch.argmax(output, dim=1)
+            # Update the correct and total counts.
+            incorrect_mask = predicted_labels != target
+            incorrect_images.append(data[incorrect_mask])
+
+        if len(incorrect_images) > 0:
+            incorrect_images = torch.cat(incorrect_images, dim=0)
+
+        validation_loss = np.mean(validation_loss_per_batch)
+
+    return validation_loss, incorrect_images

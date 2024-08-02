@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from src.automl.dummy_model import DummyCNN
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, get_optimizer
+from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, train_epoch
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,11 @@ class AutoML:
 
     def __init__(self, seed: int, dataset_class: VisionDataset, reduced_dataset_ratio: float = 1.0) -> None:
         self.seed = seed
+
         self.model: nn.Module | None = None
         self.best_config = None
+        self.best_model_loss = None
+
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
 
@@ -81,6 +84,12 @@ class AutoML:
             dataset_train = create_reduced_dataset(
                 dataset_train, ratio=self.reduced_dataset_ratio)
 
+        # Get validation dataset from train dataset
+        dataset_train, dataset_val = torch.utils.data.random_split(
+            dataset_train,
+            [0.8, 0.2]
+        )
+
         # Calculate mean and std of dataset for normalization
         mean, std = calculate_mean_std(dataset_train)
 
@@ -114,11 +123,17 @@ class AutoML:
                 ]
             )
 
+            # Set the transform to the train dataset
             dataset_train.transform = transform
 
+            # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
             train_loader = DataLoader(
                 dataset_train, batch_size=64, shuffle=True)
+
+            # TODO: Use batch_size from config
+            validation_loader = DataLoader(
+                dataset_val, batch_size=64)
 
             # TODO: Unused variable
             input_size = self.dataset_class.width * \
@@ -136,26 +151,42 @@ class AutoML:
 
             criterion = nn.CrossEntropyLoss()
 
+            # Get optimizer based on the config
             optimizer = get_optimizer(config, model)
 
-            # Train the model, calculate the loss
-            model.train()
-
+            # Train the model, calculate the training loss
+            best_epoch_loss = None
             for epoch in range(config["epochs"]):
-                loss_per_batch = []
-                for _, (data, target) in enumerate(train_loader):
-                    data, target = data.to(self.device), target.to(self.device)
-                    optimizer.zero_grad()
-                    output = model(data)
-                    loss = criterion(output, target)
-                    loss.backward()
-                    optimizer.step()
-                    loss_per_batch.append(loss.item())
-                mean_loss = np.mean(loss_per_batch)
-                logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
-            model.eval()
+                training_loss = train_epoch(
+                    optimizer=optimizer,
+                    model=model,
+                    criterion=criterion,
+                    train_loader=train_loader,
+                    device=self.device
+                )
+                logger.info(
+                    f"Epoch {epoch + 1}, Training Loss: {training_loss}")
 
-            return mean_loss
+                # Evaluate the model on the validation set
+                validation_loss, incorrect_images = evaluate_validation_epoch(
+                    model=model,
+                    criterion=criterion,
+                    validation_loader=validation_loader,
+                    device=self.device
+                )
+
+                logger.info(
+                    f"Epoch {epoch + 1}, Validation Loss: {validation_loss}")
+
+                # Save the best model based on the validation loss
+                if best_epoch_loss is None or validation_loss < best_epoch_loss:
+                    best_epoch_loss = validation_loss
+
+                if self.best_model_loss is None or best_epoch_loss < self.best_model_loss:
+                    self.best_model_loss = best_epoch_loss
+                    self.model = model
+
+            return best_epoch_loss
 
         # Run optimization pipeline with NEPS and save results to root_directory
         neps.run(
@@ -181,62 +212,62 @@ class AutoML:
         print(
             f"\t\t{best_config}\n\t\tLoss: {best_loss}\n\t\tConfig ID: {best_config_id}\n")
 
-        # ------------------ TRAIN A FINAL MODEL WITH THE BEST CONFIG ------------------
-        print("\nFinal training with the best config...\n")
-        # Configure the transform for the dataset
-        # TODO:
-        # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
-        # 2. Apply the same transform composition we used in target_function (using self.best_config this time)
-        transform = transforms.Compose(
-            [
-                # transforms.Resize(resize),
-                # transforms.RandomRotation(rotation),
-                # transforms.RandomHorizontalFlip() if horizontal_flip else transforms.Lambda(lambda x: x),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=mean, std=std),
-            ]
-        )
+        # # ------------------ TRAIN A FINAL MODEL WITH THE BEST CONFIG ------------------
+        # print("\nFinal training with the best config...\n")
+        # # Configure the transform for the dataset
+        # # TODO:
+        # # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
+        # # 2. Apply the same transform composition we used in target_function (using self.best_config this time)
+        # transform = transforms.Compose(
+        #     [
+        #         # transforms.Resize(resize),
+        #         # transforms.RandomRotation(rotation),
+        #         # transforms.RandomHorizontalFlip() if horizontal_flip else transforms.Lambda(lambda x: x),
+        #         transforms.ToTensor(),
+        #         transforms.Normalize(mean=mean, std=std),
+        #     ]
+        # )
 
-        dataset_train = self.dataset_class(
-            root="./data",
-            split='train',
-            download=True,
-            transform=transform
-        )
+        # dataset_train = self.dataset_class(
+        #     root="./data",
+        #     split='train',
+        #     download=True,
+        #     transform=transform
+        # )
 
-        # TODO: Use batch_size from self.best_config
-        train_loader = DataLoader(dataset_train, batch_size=64, shuffle=True)
+        # # TODO: Use batch_size from self.best_config
+        # train_loader = DataLoader(dataset_train, batch_size=64, shuffle=True)
 
-        model = DummyCNN(
-            input_channels=self.dataset_class.channels,
-            hidden_channels=30,
-            output_channels=self.dataset_class.num_classes,
-            image_width=self.dataset_class.width
-        )
-        model.to(self.device)
+        # model = DummyCNN(
+        #     input_channels=self.dataset_class.channels,
+        #     hidden_channels=30,
+        #     output_channels=self.dataset_class.num_classes,
+        #     image_width=self.dataset_class.width
+        # )
+        # model.to(self.device)
 
-        criterion = nn.CrossEntropyLoss()
+        # criterion = nn.CrossEntropyLoss()
 
-        optimizer = get_optimizer(self.best_config, model)
+        # optimizer = get_optimizer(self.best_config, model)
 
-        model.train()
+        # model.train()
 
-        for epoch in range(best_config["epochs"]):
-            loss_per_batch = []
-            for _, (data, target) in enumerate(train_loader):
-                data, target = data.to(self.device), target.to(self.device)
-                optimizer.zero_grad()
-                output = model(data)
-                loss = criterion(output, target)
-                loss.backward()
-                optimizer.step()
-                loss_per_batch.append(loss.item())
-            mean_loss = np.mean(loss_per_batch)
-            logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
-        model.eval()
+        # for epoch in range(best_config["epochs"]):
+        #     loss_per_batch = []
+        #     for _, (data, target) in enumerate(train_loader):
+        #         data, target = data.to(self.device), target.to(self.device)
+        #         optimizer.zero_grad()
+        #         output = model(data)
+        #         loss = criterion(output, target)
+        #         loss.backward()
+        #         optimizer.step()
+        #         loss_per_batch.append(loss.item())
+        #     mean_loss = np.mean(loss_per_batch)
+        #     logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
+        # model.eval()
 
-        # Save the final model
-        self.model = model
+        # # Save the final model
+        # self.model = model
 
         return self
 
