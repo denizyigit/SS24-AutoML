@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from neps.plot.tensorboard_eval import tblogger
 
-from src.automl.dummy_model import DummyCNN
+from src.automl.dummy_model import *
 from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, train_epoch
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class AutoML:
         # Use reduced_dataset_ratio to reduce the dataset size for faster training
         self.dataset_class = dataset_class
         self.reduced_dataset_ratio = float(reduced_dataset_ratio)
-        self.max_evaluations_total = max_evaluations_total
+        #self.max_evaluations_total = max_evaluations_total
 
     def fit(self) -> AutoML:
         # Define pipeline space for neps
@@ -121,22 +121,25 @@ class AutoML:
                     # transforms.Resize(resize),
                     # transforms.RandomRotation(rotation),
                     # transforms.RandomHorizontalFlip() if horizontal_flip else transforms.Lambda(lambda x: x),
+                    transforms.Resize((224, 224)),
                     transforms.ToTensor(),
                     transforms.Normalize(mean=mean, std=std),
+
                 ]
             )
 
             # Set the transform to the train dataset
             dataset_train.transform = transform
+            print(dataset_train)
 
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
             train_loader = DataLoader(
-                dataset_train, batch_size=64, shuffle=True, num_workers=4)
+                dataset_train, batch_size=64, shuffle=True)
 
             # TODO: Use batch_size from config
             validation_loader = DataLoader(
-                dataset_val, batch_size=64, num_workers=4)
+                dataset_val, batch_size=64)
 
             # TODO: Unused variable
             input_size = self.dataset_class.width * \
@@ -144,12 +147,19 @@ class AutoML:
 
             # Create a CNN model
             # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
-            model = DummyCNN(
+            # model = DummyCNN(
+            #     input_channels=self.dataset_class.channels,
+            #     hidden_channels=30,
+            #     output_channels=self.dataset_class.num_classes,
+            #     image_width=self.dataset_class.width
+            # )
+            model = VGG16(
                 input_channels=self.dataset_class.channels,
-                hidden_channels=30,
                 output_channels=self.dataset_class.num_classes,
-                image_width=self.dataset_class.width
+                mean=mean,
+                std=std,
             )
+
             model.to(self.device)
 
             criterion = nn.CrossEntropyLoss()
@@ -221,11 +231,10 @@ class AutoML:
             run_pipeline=target_function,
             pipeline_space=pipeline_space,
             root_directory=root_directory,
-            max_evaluations_total=self.max_evaluations_total,
+            max_evaluations_total=10,
             overwrite_working_directory=True,
-            seed=self.seed,
             post_run_summary=True,
-            optimizer="hyperband",
+            searcher="bayesian_optimization",
         )
 
         # ------------------ GET THE BEST CONFIG ------------------
@@ -251,6 +260,9 @@ class AutoML:
             download=True,
             transform=transforms.ToTensor(),
         )
+
+        # testte de transform et, traindeki mean ve std'yi kullanarak normalize et
+        #224*224'e çek
 
         # Reduce dataset size if needed for faster training
         if self.reduced_dataset_ratio < 1.0:
