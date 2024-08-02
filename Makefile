@@ -28,7 +28,7 @@ install:
 	pip install -e .
 
 run:
-	python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.1
+	python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.5 --max-evaluations-total 5
 
 check:
 	pycodestyle --max-line-length=120 src

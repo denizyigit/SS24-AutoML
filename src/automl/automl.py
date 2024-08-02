@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class AutoML:
 
-    def __init__(self, seed: int, dataset_class: VisionDataset, reduced_dataset_ratio: float = 1.0) -> None:
+    def __init__(self, seed: int, dataset_class: VisionDataset, reduced_dataset_ratio: float = 1.0, max_evaluations_total=10) -> None:
         self.seed = seed
 
         self.model: nn.Module | None = None
@@ -41,6 +41,7 @@ class AutoML:
         # Use reduced_dataset_ratio to reduce the dataset size for faster training
         self.dataset_class = dataset_class
         self.reduced_dataset_ratio = float(reduced_dataset_ratio)
+        self.max_evaluations_total = max_evaluations_total
 
     def fit(self) -> AutoML:
         # Define pipeline space for neps
@@ -49,7 +50,7 @@ class AutoML:
             batch_size=neps.IntegerParameter(lower=1, upper=100, log=True),
             learning_rate=neps.FloatParameter(
                 lower=1e-6, upper=1e-1, log=True),
-            epochs=neps.IntegerParameter(lower=1, upper=3),
+            epochs=neps.IntegerParameter(lower=10, upper=20),
 
             optimizer=neps.CategoricalParameter(
                 choices=["adam", "sgd"], default="adam"),
@@ -131,11 +132,11 @@ class AutoML:
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
             train_loader = DataLoader(
-                dataset_train, batch_size=64, shuffle=True)
+                dataset_train, batch_size=64, shuffle=True, num_workers=4)
 
             # TODO: Use batch_size from config
             validation_loader = DataLoader(
-                dataset_val, batch_size=64)
+                dataset_val, batch_size=64, num_workers=4)
 
             # TODO: Unused variable
             input_size = self.dataset_class.width * \
@@ -220,7 +221,7 @@ class AutoML:
             run_pipeline=target_function,
             pipeline_space=pipeline_space,
             root_directory=root_directory,
-            max_evaluations_total=3,
+            max_evaluations_total=self.max_evaluations_total,
             overwrite_working_directory=True,
             seed=self.seed,
             post_run_summary=True,

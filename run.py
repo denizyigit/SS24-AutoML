@@ -25,7 +25,8 @@ def main(
         dataset: str,
         output_path: Path,
         seed: int,
-        reduced_dataset_ratio: float = 1.0,
+        reduced_dataset_ratio: float,
+        max_evaluations_total: int
 ):
     match dataset:
         case "fashion":
@@ -107,6 +108,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--max-evaluations-total",
+        type=int,
+        default=10,
+        help=(
+            "Nubmer of configs to evaluate in total."
+        )
+    )
+
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Whether to log only warnings and errors."
@@ -129,4 +139,5 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         reduced_dataset_ratio=args.reduced_dataset_ratio,
+        max_evaluations_total=args.max_evaluations_total
     )
