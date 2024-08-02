@@ -1,7 +1,8 @@
 import random
-from typing import Any
+from typing import Any, Tuple
 
 import torch
+import torch.nn as nn
 from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
@@ -65,3 +66,76 @@ def get_optimizer(config, model):
         )
 
     return optimizer
+
+
+# Define the training step. Return the validation error and
+# misclassified images.
+def evaluate_loss(model: nn.Module, data_loader: DataLoader) -> float:
+    # Set the model in evaluation mode (no gradient computation).
+    model.eval()
+
+    correct = 0
+    total = 0
+
+    # Disable gradient computation for efficiency.
+    with torch.no_grad():
+        for x, y in data_loader:
+            output = model(x)
+
+            # Get the predicted class for each input.
+            _, predicted = torch.max(output.data, 1)
+
+            # Update the correct and total counts.
+            correct += (predicted == y).sum().item()
+            total += y.size(0)
+
+    # Calculate the accuracy and return the error rate.
+    accuracy = correct / total
+    error_rate = 1 - accuracy
+    return error_rate
+
+
+def training(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    criterion: nn.Module,
+    train_loader: DataLoader,
+    validation_loader: DataLoader,
+) -> Tuple[float, torch.Tensor]:
+    """
+    Function that trains the model for one epoch and evaluates the model
+    on the validation set.
+
+    Args:
+        model (nn.Module): Model to be trained.
+        optimizer (torch.optim.Optimizer): Optimizer used to train the weights.
+        criterion (nn.Module) : Loss function to use.
+        train_loader (DataLoader): DataLoader containing the training data.
+        validation_loader (DataLoader): DataLoader containing the validation data.
+
+    Returns:
+    Tuple[float, torch.Tensor]: A tuple containing the validation error (float)
+                                and a tensor of misclassified images.
+    """
+    incorrect_images = []
+    model.train()
+
+    for x, y in train_loader:
+        optimizer.zero_grad()
+        output = model(x)
+        loss = criterion(output, y)
+        loss.backward()
+        optimizer.step()
+
+        predicted_labels = torch.argmax(output, dim=1)
+        incorrect_mask = predicted_labels != y
+        incorrect_images.append(x[incorrect_mask])
+
+    # Calculate validation loss using the loss_ev function.
+    validation_loss = evaluate_loss(model, validation_loader)
+
+    # Return the misclassified image by during model training.
+    if len(incorrect_images) > 0:
+        incorrect_images = torch.cat(incorrect_images, dim=0)
+
+    return (validation_loss, incorrect_images)
