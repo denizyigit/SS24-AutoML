@@ -28,7 +28,7 @@ install:
 	pip install -e .
 
 run:
-	python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.5 --max-evaluations-total 5
+	export TF_CPP_MIN_LOG_LEVEL=2 && python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.5 --max-evaluations-total 5
 
 check:
 	pycodestyle --max-line-length=120 src
@@ -38,6 +38,9 @@ format:
 	@echo "Fixing style issues..."
 	autopep8 --in-place --aggressive --aggressive src/*.py --max-line-length=120
 	@echo "All good!"
+
+tblogger:
+	tensorboard --logdir .\results_FashionDataset\
 
 SHELL := /bin/bash
 
