@@ -51,22 +51,23 @@ class AutoML:
                 lower=1e-6, upper=1e-1, log=True),
             epochs=neps.IntegerParameter(lower=1, upper=3),
 
-            optimizer=neps.CategoricalParameter(["adam", "sgd"]),
+            optimizer=neps.CategoricalParameter(
+                choices=["adam", "sgd"], default="adam"),
 
             momentum=neps.FloatParameter(lower=0.1, upper=0.999, default=0.4),
             weight_dec_active=neps.CategoricalParameter(
-                ["True", "False"], default="False"),
+                choices=["True", "False"], default="False"),
             weight_dec_adam=neps.FloatParameter(
                 lower=0.00001, upper=0.1, default=1e-4),
             weight_dec_sgd=neps.FloatParameter(
                 lower=0.00001, upper=0.1, default=1e-4),
 
-            # image resizing, to be used in the transform
-            resize=neps.IntegerParameter(lower=224, upper=256),
-            # random rotation, to be used in the transform
-            rotation=neps.FloatParameter(lower=0.0, upper=30.0),
-            # random horizontal flip, to be used in the transform
-            horizontal_flip=neps.CategoricalParameter(choices=[True, False])
+            # # image resizing, to be used in the transform
+            # resize=neps.IntegerParameter(lower=224, upper=256),
+            # # random rotation, to be used in the transform
+            # rotation=neps.FloatParameter(lower=0.0, upper=30.0),
+            # # random horizontal flip, to be used in the transform
+            # horizontal_flip=neps.CategoricalParameter(choices=[True, False])
         )
 
         # Root directory for neps
@@ -223,6 +224,7 @@ class AutoML:
             overwrite_working_directory=True,
             seed=self.seed,
             post_run_summary=True,
+            optimizer="hyperband",
         )
 
         # ------------------ GET THE BEST CONFIG ------------------
