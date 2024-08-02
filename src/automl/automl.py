@@ -46,6 +46,8 @@ class AutoML:
     def fit(self) -> AutoML:
         # Define pipeline space for neps
         # TODO: Move pipeline_space to a separate file
+        # 3. birden fazla architecture ismi ve parameteresi ( architecutre'ın width ve height size'ı gibi) eklenmeli, ona göre resize edilmeli
+
         pipeline_space = dict(
             batch_size=neps.IntegerParameter(lower=1, upper=100, log=True),
             learning_rate=neps.FloatParameter(
@@ -116,6 +118,7 @@ class AutoML:
             # TODO:
             # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
             # 2. Apply the same transform composition in the final training as well (using self.best_config this time)
+            # 3. birden fazla architecture ismi ve parameteresi ( architecutre'ın width ve height size'ı gibi) eklenmeli, ona göre resize edilmeli
             transform = transforms.Compose(
                 [
                     # transforms.Resize(resize),
@@ -130,7 +133,6 @@ class AutoML:
 
             # Set the transform to the train dataset
             dataset_train.transform = transform
-            print(dataset_train)
 
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
