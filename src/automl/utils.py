@@ -2,6 +2,7 @@ import random
 from typing import Any
 
 import torch
+from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -13,7 +14,7 @@ def print_train_time(start: float,
     print(f"Train time on  {device} : {total_time:.3f} seconds.")
 
 
-def create_reduced_dataset(dataset, ratio=0.1):
+def create_reduced_dataset(dataset: VisionDataset, ratio=0.1) -> VisionDataset:
     """Create a reduced subset of the dataset."""
     dataset_size = len(dataset)
     subset_size = int(dataset_size * ratio)
@@ -21,23 +22,13 @@ def create_reduced_dataset(dataset, ratio=0.1):
     return Subset(dataset, indices)
 
 
-def calculate_mean_std(dataset_class: Any, ratio: float = 0.1):
+def calculate_mean_std(dataset: VisionDataset):
     """Calculate the mean and standard deviation of a subset of the image dataset."""
     mean = 0.
     std = 0.
     total_images_count = 0
 
-    full_dataset = dataset_class(
-        root="./data",
-        split='train',
-        download=True,
-        transform=transforms.ToTensor()
-    )
-
-    # Create a reduced dataset
-    reduced_dataset = create_reduced_dataset(full_dataset, ratio)
-
-    loader = DataLoader(reduced_dataset, batch_size=64, shuffle=False)
+    loader = DataLoader(dataset, batch_size=64, shuffle=False)
 
     for images, _ in loader:
         images.to(torch.device("cpu") if not torch.cuda.is_available()

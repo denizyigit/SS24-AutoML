@@ -43,11 +43,12 @@ def main(
     # an example of how your automl system could be used.
     # As a general rule of thumb, you should **never** pass in any
     # test data to your AutoML solution other than to generate predictions.
-    automl = AutoML(seed=seed, reduced_dataset_ratio=reduced_dataset_ratio)
+    automl = AutoML(seed=seed, dataset_class=dataset_class,
+                    reduced_dataset_ratio=reduced_dataset_ratio)
     # load the dataset and create a loader then pass it
-    automl.fit(dataset_class)
+    automl.fit()
     # Do the same for the test dataset
-    test_preds, test_labels = automl.predict(dataset_class)
+    test_preds, test_labels = automl.predict()
 
     # Write the predictions of X_test to disk
     # This will be used by github classrooms to get a performance
@@ -128,5 +129,4 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         reduced_dataset_ratio=args.reduced_dataset_ratio,
-
     )
