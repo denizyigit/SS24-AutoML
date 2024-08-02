@@ -44,33 +44,6 @@ class AutoML:
         self.max_evaluations_total = max_evaluations_total
 
     def fit(self) -> AutoML:
-        # Define pipeline space for neps
-        # TODO: Move pipeline_space to a separate file
-        pipeline_space = dict(
-            batch_size=neps.IntegerParameter(lower=1, upper=100, log=True),
-            learning_rate=neps.FloatParameter(
-                lower=1e-6, upper=1e-1, log=True),
-            epochs=neps.IntegerParameter(lower=10, upper=20),
-
-            optimizer=neps.CategoricalParameter(
-                choices=["adam", "sgd"], default="adam"),
-
-            momentum=neps.FloatParameter(lower=0.1, upper=0.999, default=0.4),
-            weight_dec_active=neps.CategoricalParameter(
-                choices=["True", "False"], default="False"),
-            weight_dec_adam=neps.FloatParameter(
-                lower=0.00001, upper=0.1, default=1e-4),
-            weight_dec_sgd=neps.FloatParameter(
-                lower=0.00001, upper=0.1, default=1e-4),
-
-            # # image resizing, to be used in the transform
-            # resize=neps.IntegerParameter(lower=224, upper=256),
-            # # random rotation, to be used in the transform
-            # rotation=neps.FloatParameter(lower=0.0, upper=30.0),
-            # # random horizontal flip, to be used in the transform
-            # horizontal_flip=neps.CategoricalParameter(choices=[True, False])
-        )
-
         # Root directory for neps
         root_directory = f"results_{self.dataset_class.__name__}"
 
@@ -132,11 +105,11 @@ class AutoML:
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
             train_loader = DataLoader(
-                dataset_train, batch_size=64, shuffle=True, num_workers=4)
+                dataset_train, batch_size=64, shuffle=True)
 
             # TODO: Use batch_size from config
             validation_loader = DataLoader(
-                dataset_val, batch_size=64, num_workers=4)
+                dataset_val, batch_size=64)
 
             # TODO: Unused variable
             input_size = self.dataset_class.width * \
@@ -219,7 +192,7 @@ class AutoML:
         # Run optimization pipeline with NEPS and save results to root_directory
         neps.run(
             run_pipeline=target_function,
-            pipeline_space=pipeline_space,
+            pipeline_space="src/automl/neps_pipeline_space.yaml",
             root_directory=root_directory,
             max_evaluations_total=self.max_evaluations_total,
             overwrite_working_directory=True,
@@ -271,7 +244,8 @@ class AutoML:
 
         # dataset_test.transform = transform
 
-        data_loader = DataLoader(dataset_test, batch_size=100, shuffle=False)
+        data_loader = DataLoader(
+            dataset_test, batch_size=100, shuffle=False)
         predictions = []
         labels = []
         self.model.eval()

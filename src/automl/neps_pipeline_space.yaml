@@ -1,0 +1,48 @@
+batch_size:
+  type: Integer
+  lower: 1
+  upper: 100
+  log: true
+learning_rate:
+  type: Float
+  lower: 1e-6
+  upper: 1e-1
+  log: true
+epochs:
+  type: Integer
+  lower: 10
+  upper: 20
+optimizer:
+  type: Categorical
+  choices: ["adam", "sgd"]
+  default: "adam"
+momentum:
+  type: Float
+  lower: 0.1
+  upper: 0.999
+  default: 0.4
+weight_dec_active:
+  type: Categorical
+  choices: ["True", "False"]
+  default: "False"
+weight_dec_adam:
+  type: Float
+  lower: 0.00001
+  upper: 0.1
+  default: 1e-4
+weight_dec_sgd:
+  type: Float
+  lower: 0.00001
+  upper: 0.1
+  default: 1e-4
+# resize:
+#   type: Integer
+#   lower: 224
+#   upper: 256
+# rotation:
+#   type: Float
+#   lower: 0.0
+#   upper: 30.0
+# horizontal_flip:
+#   type: Categorical
+#   choices: [True, False]
