@@ -17,6 +17,7 @@ from torchvision.datasets import VisionDataset
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from neps.plot.tensorboard_eval import tblogger
 
 from src.automl.dummy_model import DummyCNN
 from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, train_epoch
@@ -178,13 +179,38 @@ class AutoML:
                 logger.info(
                     f"Epoch {epoch + 1}, Validation Loss: {validation_loss}")
 
-                # Save the best model based on the validation loss
+                # Save the validation_loss to best_epoch_loss
+                # If and only if it is the least loss encountered so far
                 if best_epoch_loss is None or validation_loss < best_epoch_loss:
                     best_epoch_loss = validation_loss
 
+                # If best_epoch_loss is the least loss encountered so far
+                # Save the model as the best model to be used for predictions
                 if self.best_model_loss is None or best_epoch_loss < self.best_model_loss:
                     self.best_model_loss = best_epoch_loss
-                    self.model = model
+                    self.model = model  # 👈👈👈
+
+                ###################### Start Tensorboard Logging ######################
+
+                # The following tblogge` will result in:
+
+                # 1. Loss curves of each configuration at each epoch.
+                # 2. Decay curve of the learning rate at each epoch.
+                # 3. Wrongly classified images by the model.
+                # 4. First two layer gradients passed as scalar configs.
+                tblogger.log(
+                    loss=validation_loss,
+                    current_epoch=epoch,
+                    # Set to `True` for a live loss trajectory for each config.
+                    write_summary_incumbent=True,
+                    writer_config_scalar=True,
+                    writer_config_hparam=True,
+
+                    extra_data={
+                        "miss_img": tblogger.image_logging(image=incorrect_images, counter=2, seed=self.seed),
+                    },
+                )
+                ###################### End Tensorboard Logging ######################
 
             return best_epoch_loss
 
@@ -212,63 +238,6 @@ class AutoML:
         print(
             f"\t\t{best_config}\n\t\tLoss: {best_loss}\n\t\tConfig ID: {best_config_id}\n")
 
-        # # ------------------ TRAIN A FINAL MODEL WITH THE BEST CONFIG ------------------
-        # print("\nFinal training with the best config...\n")
-        # # Configure the transform for the dataset
-        # # TODO:
-        # # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
-        # # 2. Apply the same transform composition we used in target_function (using self.best_config this time)
-        # transform = transforms.Compose(
-        #     [
-        #         # transforms.Resize(resize),
-        #         # transforms.RandomRotation(rotation),
-        #         # transforms.RandomHorizontalFlip() if horizontal_flip else transforms.Lambda(lambda x: x),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=mean, std=std),
-        #     ]
-        # )
-
-        # dataset_train = self.dataset_class(
-        #     root="./data",
-        #     split='train',
-        #     download=True,
-        #     transform=transform
-        # )
-
-        # # TODO: Use batch_size from self.best_config
-        # train_loader = DataLoader(dataset_train, batch_size=64, shuffle=True)
-
-        # model = DummyCNN(
-        #     input_channels=self.dataset_class.channels,
-        #     hidden_channels=30,
-        #     output_channels=self.dataset_class.num_classes,
-        #     image_width=self.dataset_class.width
-        # )
-        # model.to(self.device)
-
-        # criterion = nn.CrossEntropyLoss()
-
-        # optimizer = get_optimizer(self.best_config, model)
-
-        # model.train()
-
-        # for epoch in range(best_config["epochs"]):
-        #     loss_per_batch = []
-        #     for _, (data, target) in enumerate(train_loader):
-        #         data, target = data.to(self.device), target.to(self.device)
-        #         optimizer.zero_grad()
-        #         output = model(data)
-        #         loss = criterion(output, target)
-        #         loss.backward()
-        #         optimizer.step()
-        #         loss_per_batch.append(loss.item())
-        #     mean_loss = np.mean(loss_per_batch)
-        #     logger.info(f"Epoch {epoch + 1}, Loss: {mean_loss}")
-        # model.eval()
-
-        # # Save the final model
-        # self.model = model
-
         return self
 
     def predict(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -278,7 +247,6 @@ class AutoML:
             split='test',
             download=True,
             transform=transforms.ToTensor(),
-
         )
 
         # Reduce dataset size if needed for faster training
@@ -286,18 +254,19 @@ class AutoML:
             dataset_test = create_reduced_dataset(
                 dataset_test, ratio=self.reduced_dataset_ratio)
 
-        # Calculate mean and std of dataset for normalization
-        mean, std = calculate_mean_std(dataset_test)
+        # TODO: decide whether to use the transform or not
+        # # Calculate mean and std of dataset for normalization
+        # mean, std = calculate_mean_std(dataset_test)
 
-        # Configure the transform for the dataset
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(mean=mean, std=std),
-            ]
-        )
+        # # Configure the transform for the dataset
+        # transform = transforms.Compose(
+        #     [
+        #         transforms.ToTensor(),
+        #         transforms.Normalize(mean=mean, std=std),
+        #     ]
+        # )
 
-        dataset_test.transform = transform
+        # dataset_test.transform = transform
 
         data_loader = DataLoader(dataset_test, batch_size=100, shuffle=False)
         predictions = []
