@@ -26,7 +26,7 @@ def main(
         output_path: Path,
         seed: int,
         reduced_dataset_ratio: float,
-        max_evaluations_total: int
+        # max_evaluations_total: int
 ):
     match dataset:
         case "fashion":
@@ -139,5 +139,5 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         reduced_dataset_ratio=args.reduced_dataset_ratio,
-        max_evaluations_total=args.max_evaluations_total
+        #max_evaluations_total=args.max_evaluations_total
     )

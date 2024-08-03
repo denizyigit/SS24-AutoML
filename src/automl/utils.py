@@ -70,9 +70,9 @@ def get_optimizer(config, model):
 
 
 def evaluate_loss(
-    model: nn.Module,
-    data_loader: DataLoader,
-    device: torch.device = torch.device("cpu")
+        model: nn.Module,
+        data_loader: DataLoader,
+        device: torch.device = torch.device("cpu")
 ) -> float:
     # Set the model in evaluation mode (no gradient computation).
     model.eval()
@@ -102,17 +102,19 @@ def evaluate_loss(
 
 
 def train_epoch(
-    model: nn.Module,
-    optimizer: torch.optim.Optimizer,
-    criterion: nn.Module,
-    train_loader: DataLoader,
-    device: torch.device = torch.device("cpu")
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        criterion: nn.Module,
+        train_loader: DataLoader,
+        device: torch.device = torch.device("cpu")
 ) -> float:
     """
     Function that trains the model for one epoch returns the mean of the training loss.
     """
     loss_per_batch = []
     model.train()
+    train_loader.dataset.transform = transforms.Compose([
+        transforms.Resize((224, 224)), transforms.ToTensor()])
     for _, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -128,10 +130,10 @@ def train_epoch(
 
 
 def evaluate_validation_epoch(
-    model: nn.Module,
-    criterion: nn.Module,
-    validation_loader: DataLoader,
-    device: torch.device = torch.device("cpu")
+        model: nn.Module,
+        criterion: nn.Module,
+        validation_loader: DataLoader,
+        device: torch.device = torch.device("cpu")
 ) -> Tuple[float, Any]:
     """
     Function that trains the model for one epoch returns the mean of the training loss.
