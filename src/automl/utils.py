@@ -69,38 +69,6 @@ def get_optimizer(config, model):
     return optimizer
 
 
-def evaluate_loss(
-        model: nn.Module,
-        data_loader: DataLoader,
-        device: torch.device = torch.device("cpu")
-) -> float:
-    # Set the model in evaluation mode (no gradient computation).
-    model.eval()
-
-    correct = 0
-    total = 0
-
-    # Disable gradient computation for efficiency.
-    with torch.no_grad():
-        for batch_idx, (data, target) in enumerate(data_loader):
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-
-            # Get the predicted class for each input.
-            a, predicted = torch.max(output.data, 1)
-            print("_:", a)
-            print("predicted:", predicted)
-            print("y:", target)
-            # Update the correct and total counts.
-            correct += (predicted == target).sum().item()
-            total += target.size(0)
-
-    # Calculate the accuracy and return the error rate.
-    accuracy = correct / total
-    error_rate = 1 - accuracy
-    return error_rate
-
-
 def train_epoch(
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
@@ -162,3 +130,20 @@ def evaluate_validation_epoch(
         validation_loss = np.mean(validation_loss_per_batch)
 
     return validation_loss, incorrect_images
+
+
+def get_transform(config: dict[str, Any], mean: float, std: float):
+    if not config:
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)
+        ])
+
+    return transform

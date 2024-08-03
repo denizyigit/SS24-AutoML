@@ -10,8 +10,8 @@ learning_rate:
   log: true
 epochs:
   type: Integer
-  lower: 10
-  upper: 20
+  lower: 1
+  upper: 3
 optimizer:
   type: Categorical
   choices: ["adam", "sgd"]

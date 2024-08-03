@@ -20,7 +20,7 @@ from torchvision import transforms
 from neps.plot.tensorboard_eval import tblogger
 
 from src.automl.dummy_model import *
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, train_epoch
+from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, get_transform, train_epoch
 
 logger = logging.getLogger(__name__)
 
@@ -43,37 +43,28 @@ class AutoML:
         self.reduced_dataset_ratio = float(reduced_dataset_ratio)
         # self.max_evaluations_total = max_evaluations_total
 
+        self.mean_train = None
+        self.std_train = None
+
     def fit(self) -> AutoML:
         # Root directory for neps
         root_directory = f"results_{self.dataset_class.__name__}"
-
-        # Get train dataset with default transform
-        dataset_train = self.dataset_class(
-            root="./data",
-            split='train',
-            download=True,
-            transform=transforms.ToTensor()
-        )
-
-        # Reduce dataset size if needed for faster training
-        if self.reduced_dataset_ratio < 1.0:
-            dataset_train = create_reduced_dataset(
-                dataset_train, ratio=self.reduced_dataset_ratio)
-
-        # Get validation dataset from train dataset
-        dataset_train, dataset_val = torch.utils.data.random_split(
-            dataset_train,
-            [0.8, 0.2]
-        )
-
-        # Calculate mean and std of dataset for normalization
-        mean, std = calculate_mean_std(dataset_train)
 
         print(f"Cuda available: {torch.cuda.is_available()}")
         print(
             f"Training on dataset: {self.dataset_class.__name__}, type: {self.dataset_class.__class__})")
         print(
             f"Reduced dataset ratio: {self.reduced_dataset_ratio} is used for faster training.")
+
+        # Calculate mean and std of training dataset for normalization transforms, both for training and testing
+        # Then assign them to the class variables
+        dataset_train = self.dataset_class(
+            root="./data",
+            split='train',
+            download=True,
+            transform=transforms.ToTensor(),
+        )
+        self.mean_train, self.std_train = calculate_mean_std(dataset_train)
 
         # Define the target function for neps
         def target_function(**config):
@@ -90,20 +81,30 @@ class AutoML:
             # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
             # 2. Apply the same transform composition in the final training as well (using self.best_config this time)
             # 3. birden fazla architecture ismi ve parameteresi ( architecutre'ın width ve height size'ı gibi) eklenmeli, ona göre resize edilmeli
-            transform = transforms.Compose(
-                [
-                    # transforms.Resize(resize),
-                    # transforms.RandomRotation(rotation),
-                    # transforms.RandomHorizontalFlip() if horizontal_flip else transforms.Lambda(lambda x: x),
-                    transforms.Resize((224, 224)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=mean, std=std),
-
-                ]
+            transform = get_transform(
+                config=config,
+                mean=self.mean_train,
+                std=self.std_train,
             )
 
-            # Set the transform to the train dataset
-            dataset_train.transform = transform
+            # Get train dataset with the defined transform
+            dataset_train = self.dataset_class(
+                root="./data",
+                split='train',
+                download=True,
+                transform=transform
+            )
+
+            # Reduce dataset size if needed for faster training
+            if self.reduced_dataset_ratio < 1.0:
+                dataset_train = create_reduced_dataset(
+                    dataset_train, ratio=self.reduced_dataset_ratio)
+
+            # Split train dataset into train and validation datasets
+            dataset_train, dataset_val = torch.utils.data.random_split(
+                dataset_train,
+                [0.8, 0.2]
+            )
 
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
@@ -120,17 +121,20 @@ class AutoML:
 
             # Create a CNN model
             # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
+            # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
+
             # model = DummyCNN(
             #     input_channels=self.dataset_class.channels,
             #     hidden_channels=30,
             #     output_channels=self.dataset_class.num_classes,
             #     image_width=self.dataset_class.width
             # )
+
             model = VGG16(
                 input_channels=self.dataset_class.channels,
                 output_channels=self.dataset_class.num_classes,
-                mean=mean,
-                std=std,
+                mean=self.mean_train,
+                std=self.std_train,
             )
 
             model.to(self.device)
@@ -204,7 +208,7 @@ class AutoML:
             run_pipeline=target_function,
             pipeline_space="src/automl/neps_pipeline_space.yaml",
             root_directory=root_directory,
-            max_evaluations_total=10,
+            max_evaluations_total=3,
             overwrite_working_directory=True,
             post_run_summary=True,
             searcher="bayesian_optimization",
@@ -226,35 +230,23 @@ class AutoML:
         return self
 
     def predict(self) -> Tuple[np.ndarray, np.ndarray]:
-        # Get test dataset with default transform
+        # Configure the transform for the test dataset, without data augmentation
+        transform = get_transform(
+            mean=self.mean_train,
+            std=self.std_train,
+        )
+
         dataset_test = self.dataset_class(
             root="./data",
             split='test',
             download=True,
-            transform=transforms.ToTensor(),
+            transform=transform,
         )
-
-        # testte de transform et, traindeki mean ve std'yi kullanarak normalize et
-        # 224*224'e çek
 
         # Reduce dataset size if needed for faster training
         if self.reduced_dataset_ratio < 1.0:
             dataset_test = create_reduced_dataset(
                 dataset_test, ratio=self.reduced_dataset_ratio)
-
-        # TODO: decide whether to use the transform or not
-        # # Calculate mean and std of dataset for normalization
-        # mean, std = calculate_mean_std(dataset_test)
-
-        # # Configure the transform for the dataset
-        # transform = transforms.Compose(
-        #     [
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=mean, std=std),
-        #     ]
-        # )
-
-        # dataset_test.transform = transform
 
         data_loader = DataLoader(
             dataset_test, batch_size=100, shuffle=False)
