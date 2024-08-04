@@ -21,6 +21,7 @@ from neps.plot.tensorboard_eval import tblogger
 
 from src.automl.dummy_model import *
 from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, get_transform, train_epoch
+from src.automl.pipeline_space import pipeline_space
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,7 @@ class AutoML:
         # Run optimization pipeline with NEPS and save results to root_directory
         neps.run(
             run_pipeline=target_function,
-            pipeline_space="src/automl/neps_pipeline_space.yaml",
+            pipeline_space=pipeline_space,
             root_directory=root_directory,
             max_evaluations_total=1,
             overwrite_working_directory=True,
