@@ -234,7 +234,7 @@ class AutoML:
                 "strategy": "priorband",
                 "eta": 3,
                 "initial_design_type": "max_budget",
-            }
+            },
             # Total cost, we use the time spent on evaluation as cost (seconds)
             max_cost_total=1000,
         )
