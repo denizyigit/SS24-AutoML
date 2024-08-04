@@ -26,6 +26,7 @@ from neps.plot.tensorboard_eval import tblogger
 from src.automl.dummy_model import *
 from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, get_transform, train_epoch
 from src.automl.pipeline_space import pipeline_space
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +74,13 @@ class AutoML:
 
         # Define the target function for neps
         def target_function(**config):
-
             print("\n------------------")
             print("Evaluation with config:")
             print(config)
+
+            # Calculate how much time is spent on the evaluation
+            # This is useful for multi-fidelity optimization
+            start_time = time.time()
 
             random.seed(self.seed)
             np.random.seed(self.seed)
@@ -211,7 +215,12 @@ class AutoML:
                 )
                 ###################### End Tensorboard Logging ######################
 
-            return best_epoch_loss
+            end_time = time.time()
+
+            print(
+                f"\nBest epoch loss: {best_epoch_loss}, Time: {end_time - start_time}\n")
+
+            return {"loss": best_epoch_loss, "cost": end_time - start_time}
 
         # Run optimization pipeline with NEPS and save results to root_directory
         neps.run(
@@ -222,11 +231,12 @@ class AutoML:
             overwrite_working_directory=True,
             post_run_summary=True,
             searcher={
-                "strategy": "hyperband",
+                "strategy": "priorband",
                 "eta": 3,
                 "initial_design_type": "max_budget",
-                "use_priors": False,
             }
+            # Total cost, we use the time spent on evaluation as cost (seconds)
+            max_cost_total=1000,
         )
 
         # ------------------ GET THE BEST CONFIG ------------------
