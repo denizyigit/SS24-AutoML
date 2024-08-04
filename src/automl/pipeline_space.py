@@ -2,7 +2,7 @@ import neps
 
 pipeline_space = {
     "batch_size": neps.Categorical(choices=[32.0, 64.0, 128.0, 256.0], default=64.0),
-    "learning_rate": neps.Float(lower=1e-6, upper=1e-1, log=True),
+    "learning_rate": neps.Float(lower=1e-6, upper=1e-1, log=True, default_confidence="medium"),
     "epochs": neps.Integer(lower=1, upper=2, is_fidelity=True),
     "optimizer": neps.Categorical(choices=["adam", "sgd"], default="adam"),
     "momentum": neps.Float(lower=0.1, upper=0.999, default=0.4),
