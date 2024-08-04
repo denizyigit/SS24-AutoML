@@ -11,7 +11,7 @@ learning_rate:
 epochs:
   type: Integer
   lower: 1
-  upper: 3
+  upper: 2
 optimizer:
   type: Categorical
   choices: ["adam", "sgd"]

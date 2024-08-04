@@ -208,7 +208,7 @@ class AutoML:
             run_pipeline=target_function,
             pipeline_space="src/automl/neps_pipeline_space.yaml",
             root_directory=root_directory,
-            max_evaluations_total=3,
+            max_evaluations_total=1,
             overwrite_working_directory=True,
             post_run_summary=True,
             searcher="bayesian_optimization",

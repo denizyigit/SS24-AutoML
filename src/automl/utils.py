@@ -144,7 +144,11 @@ def evaluate_validation_epoch(
     return validation_loss, incorrect_images
 
 
-def get_transform(config: dict[str, Any], mean: float, std: float):
+def get_transform(
+        config: dict[str, Any] = None,
+        mean: float = 0.5,
+        std: float = 0.5
+):
     if not config:
         # If config is not given, return the default transform.
         transform = transforms.Compose([
