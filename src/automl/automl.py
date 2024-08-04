@@ -123,19 +123,19 @@ class AutoML:
             # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
             # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
 
-            # model = DummyCNN(
-            #     input_channels=self.dataset_class.channels,
-            #     hidden_channels=30,
-            #     output_channels=self.dataset_class.num_classes,
-            #     image_width=self.dataset_class.width
-            # )
-
-            model = VGG16(
+            model = DummyCNN(
                 input_channels=self.dataset_class.channels,
+                hidden_channels=30,
                 output_channels=self.dataset_class.num_classes,
-                mean=self.mean_train,
-                std=self.std_train,
+                image_width=self.dataset_class.width
             )
+
+            # model = VGG16(
+            #     input_channels=self.dataset_class.channels,
+            #     output_channels=self.dataset_class.num_classes,
+            #     mean=self.mean_train,
+            #     std=self.std_train,
+            # )
 
             model.to(self.device)
 

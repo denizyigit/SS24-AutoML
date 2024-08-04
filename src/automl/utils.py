@@ -9,6 +9,18 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
 
+class AddGaussianNoise(object):
+    def __init__(self, mean=0.0, std=1.0):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        return tensor + torch.randn(tensor.size()) * self.std + self.mean
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+
+
 def print_train_time(start: float,
                      end: float,
                      device: torch.device = None):
@@ -134,15 +146,43 @@ def evaluate_validation_epoch(
 
 def get_transform(config: dict[str, Any], mean: float, std: float):
     if not config:
+        # If config is not given, return the default transform.
         transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            # transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std)
         ])
     else:
+        # If config is given, return the transform with the specified parameters
         transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            # transforms.Resize((224, 224)),
             transforms.ToTensor(),
+            transforms.RandomHorizontalFlip(
+                p=config["random_horizontal_flip_prob"]
+            ),
+            transforms.RandomVerticalFlip(
+                p=config["random_vertical_flip_prob"]
+            ),
+            transforms.RandomApply([transforms.RandomRotation(
+                config["random_rotation_deg"])],
+                p=config["random_rotation_prob"]
+            ),
+            transforms.RandomApply(
+                [
+                    AddGaussianNoise(
+                        config["random_gaussian_noise_mean"],
+                        config["random_gaussian_noise_std"])
+                ],
+                p=config["random_gaussian_noise_prob"]
+            ),
+            transforms.RandomApply(
+                [
+                    transforms.ColorJitter(
+                        brightness=config["brightness"],
+                        contrast=config["contrast"],
+                        saturation=config["saturation"])
+                ], p=0.5
+            ),  # Assume a fixed probability for ColorJitter
             transforms.Normalize(mean=mean, std=std)
         ])
 

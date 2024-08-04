@@ -35,14 +35,64 @@ weight_dec_sgd:
   lower: 0.00001
   upper: 0.1
   default: 1e-4
-# resize:
-#   type: Integer
-#   lower: 224
-#   upper: 256
-# rotation:
-#   type: Float
-#   lower: 0.0
-#   upper: 30.0
-# horizontal_flip:
-#   type: Categorical
-#   choices: [True, False]
+
+# Data Augmentation
+random_horizontal_flip_prob:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+random_vertical_flip_prob:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+random_rotation_deg:
+  type: Integer
+  lower: 0
+  upper: 180
+  default: 90
+
+random_rotation_prob:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+random_gaussian_noise_mean:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.0
+
+random_gaussian_noise_std:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.1
+
+random_gaussian_noise_prob:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+brightness:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+contrast:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
+
+saturation:
+  type: Float
+  lower: 0.0
+  upper: 1.0
+  default: 0.5
