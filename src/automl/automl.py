@@ -8,6 +8,10 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 import neps
+import neps.optimizers
+import neps.optimizers.multi_fidelity
+import neps.optimizers.multi_fidelity.hyperband
+import neps.optimizers.multi_fidelity.sampling_policy
 import torch
 import random
 import numpy as np
@@ -69,6 +73,11 @@ class AutoML:
 
         # Define the target function for neps
         def target_function(**config):
+
+            print("\n------------------")
+            print("Evaluation with config:")
+            print(config)
+
             random.seed(self.seed)
             np.random.seed(self.seed)
             torch.manual_seed(self.seed)
@@ -209,10 +218,15 @@ class AutoML:
             run_pipeline=target_function,
             pipeline_space=pipeline_space,
             root_directory=root_directory,
-            max_evaluations_total=1,
+            max_evaluations_total=3,
             overwrite_working_directory=True,
             post_run_summary=True,
-            searcher="bayesian_optimization",
+            searcher={
+                "strategy": "hyperband",
+                "eta": 3,
+                "initial_design_type": "max_budget",
+                "use_priors": False,
+            }
         )
 
         # ------------------ GET THE BEST CONFIG ------------------
