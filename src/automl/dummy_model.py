@@ -1,7 +1,7 @@
 from torch import nn
 import math
 from torchvision import models, transforms
-from torchvision.models import vgg16
+from torchvision.models import vgg16, resnet18, mobilenet_v2, ResNet18_Weights, MobileNet_V2_Weights
 
 
 class DummyNN(nn.Module):
@@ -68,16 +68,45 @@ class DummyCNN(nn.Module):
         return x
 
 
+class ResNet(nn.Module):
+    def __init__(self, output_channels: int,):
+        super().__init__()
+        self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+
+        in_features = self.model.fc.in_features
+
+        self.model.fc = nn.Linear(
+            in_features=in_features, out_features=output_channels, bias=True)
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class MobileNet(nn.Module):
+    def __init__(self, output_channels: int,):
+        super().__init__()
+        self.model = mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V2)
+
+        in_features = self.model.classifier[1].in_features
+
+        self.model.classifier[1] = nn.Linear(
+            in_features=in_features, out_features=output_channels, bias=True)
+
+    def forward(self, x):
+        return self.model(x)
+
+
 class VGG16(nn.Module):
     def __init__(self, input_channels: int, output_channels: int, mean: float, std: float):
         super().__init__()
         self.normalize = transforms.Normalize(mean=mean, std=std)
         self.resize = transforms.Resize((224, 224))
-        ## buraya generic value'lar yollanacak, automl'de config'ten çektiğim data trasnformerları, buraya yollanacak
+        # buraya generic value'lar yollanacak, automl'de config'ten çektiğim data trasnformerları, buraya yollanacak
         self.model = vgg16()
         self.model.features[0] = nn.Conv2d(in_channels=input_channels, out_channels=64, kernel_size=(3, 3),
                                            stride=(1, 1), padding=(1, 1))
-        self.model.classifier[6] = nn.Linear(in_features=4096, out_features=output_channels, bias=True)
+        self.model.classifier[6] = nn.Linear(
+            in_features=4096, out_features=output_channels, bias=True)
 
-    def forward(self, x): ## validationa normalize ve resize veya augmentasyonlar eklenmememeli, if else koyılmalı alta
+    def forward(self, x):  # validationa normalize ve resize veya augmentasyonlar eklenmememeli, if else koyılmalı alta
         return self.model(self.normalize(self.resize(x)))
