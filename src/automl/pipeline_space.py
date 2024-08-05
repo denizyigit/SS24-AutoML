@@ -39,10 +39,11 @@ class PipelineSpace:
         self.saturation = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
 
-    def get_pipeline_space(self, seed, dataset, reduced_dataset_ratio):
+    def get_pipeline_space(self, seed, pid, dataset, reduced_dataset_ratio):
         return {
             # Constant values
             "seed": neps.Constant(value=seed),
+            "pid": neps.Constant(value=pid),
             "dataset": neps.Constant(value=dataset),
             "reduced_dataset_ratio": neps.Constant(value=reduced_dataset_ratio),
 

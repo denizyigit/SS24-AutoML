@@ -5,6 +5,7 @@ You do not need to use this setup, and you can modify this however you like.
 """
 from __future__ import annotations
 
+import multiprocessing
 from typing import Any, Tuple
 
 import neps
@@ -25,7 +26,7 @@ from neps.plot.tensorboard_eval import tblogger
 
 from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
 from src.automl.dummy_model import *
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_dataset_class, get_optimizer, get_transform, train_epoch
+from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_transform, train_epoch
 from src.automl.pipeline_space import PipelineSpace
 import time
 
@@ -149,8 +150,8 @@ def target_function(**config):
             train_loader=train_loader,
             device=device
         )
-        logger.info(
-            f"Epoch {epoch + 1}, Training Loss: {training_loss}")
+        print(
+            f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}")
 
         # Evaluate the model on the validation set
         validation_loss, incorrect_images = evaluate_validation_epoch(
@@ -159,8 +160,8 @@ def target_function(**config):
             validation_loader=validation_loader,
             device=device
         )
-        logger.info(
-            f"Epoch {epoch + 1}, Validation Loss: {validation_loss}")
+        print(
+            f"PID_{config['pid']}: Epoch {epoch + 1}, Validation Loss: {validation_loss}")
 
         if (best_validation_loss is None or validation_loss < best_validation_loss):
             best_validation_loss = validation_loss
@@ -188,9 +189,39 @@ def target_function(**config):
     end_time = time.time()
 
     print(
-        f"\nValidation loss: {best_validation_loss}, Time spent: {end_time - start_time} \n")
+        f"\nPID_{config['pid']}: Validation loss: {best_validation_loss}, Time spent: {end_time - start_time} \n")
 
     return {"loss": best_validation_loss, "cost": end_time - start_time}
+
+# Function to be targeted by multiple processors
+# Each processor will run the optimization pipeline with NEPS in parallel
+
+
+def neps_run_multiprocessor(seed: int, pid: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
+    # Get the pipeline space for the optimization
+    pipeline_space = PipelineSpace().get_pipeline_space(
+        seed=seed,
+        pid=pid,
+        dataset=dataset,
+        reduced_dataset_ratio=reduced_dataset_ratio,
+    )
+
+    # Run optimization pipeline with NEPS and save results to root_directory
+    neps.run(
+        run_pipeline=target_function,
+        pipeline_space=pipeline_space,
+        root_directory=root_directory,
+        max_evaluations_total=6,
+        overwrite_working_directory=False,
+        post_run_summary=True,
+        searcher={
+            "strategy": "priorband",
+            "eta": 3,
+        },
+        # Total cost, we use the time spent on evaluation as cost (seconds)
+        max_cost_total=1000,
+        task_id=f'PID_{pid}',
+    )
 
 
 class AutoML:
@@ -222,34 +253,33 @@ class AutoML:
         print(
             f"Reduced dataset ratio: {self.reduced_dataset_ratio} is used for faster training.")
 
-        pipeline_space = PipelineSpace().get_pipeline_space(
-            seed=self.seed,
-            dataset=self.dataset,
-            reduced_dataset_ratio=self.reduced_dataset_ratio,
+        num_processes = 3
+        processes = []
+        for i in range(num_processes):
+            p = multiprocessing.Process(
+                target=neps_run_multiprocessor,
+                args=(
+                    self.seed,
+                    i,
+                    self.dataset,
+                    self.reduced_dataset_ratio,
+                    root_directory,
+                )
+            )
+            p.start()
+            processes.append(p)
+
+        # Wait for all processes to finish
+        for p in processes:
+            p.join()
+
+        # ------------------ GET THE BEST CONFIG FROM RESULTS ------------------
+        best_config, best_loss, best_config_id = get_best_config_from_results(
+            root_directory,
+            num_processes
         )
 
-        # Run optimization pipeline with NEPS and save results to root_directory
-        neps.run(
-            run_pipeline=target_function,
-            pipeline_space=pipeline_space,
-            root_directory=root_directory,
-            max_evaluations_total=3,
-            overwrite_working_directory=False,
-            post_run_summary=True,
-            searcher={
-                "strategy": "priorband",
-                "eta": 3,
-            },
-            # Total cost, we use the time spent on evaluation as cost (seconds)
-            max_cost_total=1000,
-        )
-
-        summary = neps.get_summary_dict(root_directory)
-        best_config = summary["best_config"]
-        best_config_id = summary["best_config_id"]
-        best_loss = summary["best_loss"]
-
-        # Save best config
+        # Save the best config for later use
         self.best_config = best_config
 
         print("\n\tBEST CONFIG:")
