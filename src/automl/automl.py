@@ -70,6 +70,12 @@ def target_function(**config):
     # Calculate mean and std of the training dataset
     mean_train, std_train = calculate_mean_std(dataset_train)
 
+    # Split train dataset into train and validation datasets
+    dataset_train, dataset_val = torch.utils.data.random_split(
+        dataset_train,
+        [0.8, 0.2]
+    )
+
     # Configure the transform for the dataset
     # TODO:
     # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
@@ -88,12 +94,6 @@ def target_function(**config):
         split='train',
         download=True,
         transform=transform
-    )
-
-    # Split train dataset into train and validation datasets
-    dataset_train, dataset_val = torch.utils.data.random_split(
-        dataset_train,
-        [0.8, 0.2]
     )
 
     # Reduce dataset size if needed for faster training
@@ -167,7 +167,7 @@ def target_function(**config):
             writer_config_hparam=True,
 
             extra_data={
-                "miss_img": tblogger.image_logging(image=incorrect_images, counter=2, seed=config["seed"]),
+                "miss_img": tblogger.image_logging(image=incorrect_images, counter=1, seed=config["seed"]),
             },
         )
         ###################### End Tensorboard Logging ######################

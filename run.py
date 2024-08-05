@@ -9,7 +9,7 @@ to a file, which we will grade using github classrooms!
 from __future__ import annotations
 
 from pathlib import Path
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import top_k_accuracy_score
 import numpy as np
 from src.automl.automl import AutoML
 import argparse
@@ -51,9 +51,12 @@ def main(
     # check if test_labels has missing data
 
     if not np.isnan(test_labels).any():
-        acc = accuracy_score(test_labels, test_preds)
+        acc_top_1 = top_k_accuracy_score(test_labels, test_preds, k=1)
+        acc_top_5 = top_k_accuracy_score(test_labels, test_preds, k=5)
+
         print(f"test labels length: {len(test_labels)}")
-        logger.info(f"Accuracy on test set: {acc}")
+        logger.info(f"Top 1 Accuracy on test set: {acc_top_1}")
+        logger.info(f"Top 5 Accuracy on test set: {acc_top_5}")
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         logger.info(f"No test split for dataset '{dataset}'")
