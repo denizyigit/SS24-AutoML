@@ -197,11 +197,11 @@ def target_function(**config):
 # Each processor will run the optimization pipeline with NEPS in parallel
 
 
-def neps_run_multiprocessor(seed: int, pid: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
+def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
     # Get the pipeline space for the optimization
     pipeline_space = PipelineSpace().get_pipeline_space(
-        seed=seed,
         pid=pid,
+        seed=seed,
         dataset=dataset,
         reduced_dataset_ratio=reduced_dataset_ratio,
     )
@@ -220,8 +220,39 @@ def neps_run_multiprocessor(seed: int, pid: int, dataset: str, reduced_dataset_r
         },
         # Total cost, we use the time spent on evaluation as cost (seconds)
         max_cost_total=1000,
-        task_id=f'PID_{pid}',
+        task_id=f'PID_{pid}' if pid != -1 else None,
     )
+
+
+def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
+    if num_process > 1:
+        # Create multiple processes to run the optimization pipeline in parallel
+        processes = []
+        for i in range(num_process):
+            p = multiprocessing.Process(
+                target=neps_run_pipeline,
+                args=(
+                    i,
+                    seed,
+                    dataset,
+                    reduced_dataset_ratio,
+                    root_directory,
+                )
+            )
+            p.start()
+            processes.append(p)
+
+        # Wait for all processes to finish
+        for p in processes:
+            p.join()
+    else:
+        neps_run_pipeline(
+            -1,  # pid=-1 means that no task_id will be used in neps.run
+            seed,
+            dataset,
+            reduced_dataset_ratio,
+            root_directory
+        )
 
 
 class AutoML:
@@ -244,6 +275,9 @@ class AutoML:
         self.mean_train = None
         self.std_train = None
 
+        # Number of processes to run the optimization pipeline in parallel, default 1 means no parallelization
+        self.num_process = 2
+
     def fit(self) -> AutoML:
         # Root directory for neps
         root_directory = f"results_{self.dataset}"
@@ -253,30 +287,18 @@ class AutoML:
         print(
             f"Reduced dataset ratio: {self.reduced_dataset_ratio} is used for faster training.")
 
-        num_processes = 3
-        processes = []
-        for i in range(num_processes):
-            p = multiprocessing.Process(
-                target=neps_run_multiprocessor,
-                args=(
-                    self.seed,
-                    i,
-                    self.dataset,
-                    self.reduced_dataset_ratio,
-                    root_directory,
-                )
-            )
-            p.start()
-            processes.append(p)
-
-        # Wait for all processes to finish
-        for p in processes:
-            p.join()
+        neps_run_pipeline_multiprocessor(
+            self.num_process,
+            self.seed,
+            self.dataset,
+            self.reduced_dataset_ratio,
+            root_directory
+        )
 
         # ------------------ GET THE BEST CONFIG FROM RESULTS ------------------
         best_config, best_loss, best_config_id = get_best_config_from_results(
             root_directory,
-            num_processes
+            self.num_process
         )
 
         # Save the best config for later use

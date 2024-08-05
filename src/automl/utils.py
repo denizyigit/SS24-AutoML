@@ -222,27 +222,42 @@ def get_dataset_class(dataset: str):
             raise ValueError(f"Invalid dataset: {dataset}")
 
 
-def get_best_config_from_results(root_directory: str, num_processes: int):
+def get_best_config_from_results(root_directory: str, num_process: int):
     absolute_best_config = None
     absolute_best_loss = float("inf")
     absolute_best_config_id = None
 
-    # Iterate over each subdirectory
-    for subdirectory_index in range(num_processes):
-        subdirectory_path = os.path.join(
-            root_directory, f"task_PID_{subdirectory_index}")
+    if (num_process > 1):
+        # Iterate over each subdirectory
+        for subdirectory_index in range(num_process):
+            subdirectory_path = os.path.join(
+                root_directory, f"task_PID_{subdirectory_index}")
 
+            # Get the summary dictionary from the current subdirectory
+            summary = neps.get_summary_dict(subdirectory_path)
+
+            best_config = summary["best_config"]
+            best_config_id = summary["best_config_id"]
+            best_loss = summary["best_loss"]
+
+            # Compare and update the absolute best configuration
+            if best_loss < absolute_best_loss:
+                absolute_best_config = best_config
+                absolute_best_loss = best_loss
+                absolute_best_config_id = best_config_id
+    else:
         # Get the summary dictionary from the current subdirectory
-        summary = neps.get_summary_dict(subdirectory_path)
+        summary = neps.get_summary_dict(root_directory)
+
         best_config = summary["best_config"]
         best_config_id = summary["best_config_id"]
         best_loss = summary["best_loss"]
 
-    # Compare and update the absolute best configuration
-    if best_loss < absolute_best_loss:
-        absolute_best_config = best_config
-        absolute_best_loss = best_loss
-        absolute_best_config_id = best_config_id
+        # Compare and update the absolute best configuration
+        if best_loss < absolute_best_loss:
+            absolute_best_config = best_config
+            absolute_best_loss = best_loss
+            absolute_best_config_id = best_config_id
 
     # Save the absolute best config
     return absolute_best_config, absolute_best_loss, absolute_best_config_id

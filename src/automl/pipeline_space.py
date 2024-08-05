@@ -5,9 +5,12 @@ class PipelineSpace:
     def __init__(self):
         self.batch_size = neps.Categorical(
             choices=[32.0, 64.0, 128.0, 256.0], default=64.0, default_confidence="low")
+
         self.learning_rate = neps.Float(
             lower=1e-6, upper=1e-1, log=True, default=1e-3, default_confidence="medium")
-        self.epochs = neps.Integer(lower=1, upper=2, is_fidelity=True)
+
+        self.epochs = neps.Integer(lower=1, upper=3, is_fidelity=True)
+
         self.optimizer = neps.Categorical(
             choices=["adam", "sgd"], default="adam", default_confidence="low")
         self.momentum = neps.Float(
@@ -39,11 +42,11 @@ class PipelineSpace:
         self.saturation = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
 
-    def get_pipeline_space(self, seed, pid, dataset, reduced_dataset_ratio):
+    def get_pipeline_space(self, pid, seed,  dataset, reduced_dataset_ratio):
         return {
             # Constant values
-            "seed": neps.Constant(value=seed),
             "pid": neps.Constant(value=pid),
+            "seed": neps.Constant(value=seed),
             "dataset": neps.Constant(value=dataset),
             "reduced_dataset_ratio": neps.Constant(value=reduced_dataset_ratio),
 
