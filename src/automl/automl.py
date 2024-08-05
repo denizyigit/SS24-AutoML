@@ -26,7 +26,7 @@ from neps.plot.tensorboard_eval import tblogger
 
 from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
 from src.automl.dummy_model import *
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_transform, train_epoch
+from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_scheduler, get_transform, train_epoch
 from src.automl.pipeline_space import PipelineSpace
 import time
 
@@ -118,7 +118,13 @@ def target_function(**config):
     # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
     # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
 
-    model = MobileNet(output_channels=dataset_class.num_classes)
+    # model = MobileNet(output_channels=dataset_class.num_classes)
+    model = DummyCNN(
+        input_channels=dataset_class.channels,
+        hidden_channels=30,
+        output_channels=dataset_class.num_classes,
+        image_width=dataset_class.width
+    )
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -126,12 +132,17 @@ def target_function(**config):
     # Get optimizer based on the config
     optimizer = get_optimizer(config, model)
 
+    # LR scheduler
+    scheduler = get_scheduler(config, optimizer, train_loader)
+
     # Train the model, calculate the training loss
     best_validation_loss = None
 
     for epoch in range(config["epochs"]):
         training_loss = train_epoch(
+            config=config,
             optimizer=optimizer,
+            scheduler=scheduler,
             model=model,
             criterion=criterion,
             train_loader=train_loader,
@@ -145,6 +156,10 @@ def target_function(**config):
             validation_loader=validation_loader,
             device=device
         )
+
+        # If the scheduler is reduceLROnPlateau, step the scheduler on each epoch
+        if config["scheduler"] == "reduceLROnPlateau":
+            scheduler.step(validation_loss)
 
         print(
             f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}, Validation Loss: {validation_loss}")
@@ -168,6 +183,7 @@ def target_function(**config):
 
             extra_data={
                 "miss_img": tblogger.image_logging(image=incorrect_images, counter=1, seed=config["seed"]),
+                "lr_decay": tblogger.scalar_logging(value=scheduler.get_last_lr()[0])
             },
         )
         ###################### End Tensorboard Logging ######################
@@ -336,17 +352,27 @@ class AutoML:
         train_loader = DataLoader(
             dataset_train, batch_size=int(self.best_config["batch_size"]), shuffle=True)
 
-        model = MobileNet(output_channels=dataset_class.num_classes)
+        # model = MobileNet(output_channels=dataset_class.num_classes)
+        model = DummyCNN(
+            input_channels=dataset_class.channels,
+            hidden_channels=30,
+            output_channels=dataset_class.num_classes,
+            image_width=dataset_class.width
+        )
         model.to(self.device)
 
         criterion = nn.CrossEntropyLoss()
 
         optimizer = get_optimizer(self.best_config, model)
 
+        scheduler = get_scheduler(self.best_config, optimizer, train_loader)
+
         # Train the model, calculate the training loss
         for epoch in range(self.best_config["epochs"]):
             training_loss = train_epoch(
+                config=self.best_config,
                 optimizer=optimizer,
+                scheduler=scheduler,
                 model=model,
                 criterion=criterion,
                 train_loader=train_loader,
@@ -391,9 +417,9 @@ class AutoML:
             for data, target in data_loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.best_model(data)
-                predicted = torch.argmax(output, 1)
+                # predicted = torch.argmax(output, 1)
                 labels.append(target.to("cpu").numpy())
-                predictions.append(predicted.to("cpu").numpy())
+                predictions.append(output.to("cpu").numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
 

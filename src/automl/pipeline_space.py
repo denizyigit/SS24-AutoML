@@ -11,6 +11,11 @@ class PipelineSpace:
 
         self.epochs = neps.Integer(lower=1, upper=15, is_fidelity=True)
 
+        # Scheduler
+        self.scheduler = neps.Categorical(
+            choices=["oneCycleLR", "reduceLROnPlateau"], default="oneCycleLR", default_confidence="low")
+
+        #  Optimizer
         self.optimizer = neps.Categorical(
             choices=["adam", "sgd"], default="adam", default_confidence="low")
         self.momentum = neps.Float(
@@ -21,6 +26,8 @@ class PipelineSpace:
             lower=0.00001, upper=0.1, default=1e-4, default_confidence="low")
         self.weight_dec_sgd = neps.Float(
             lower=0.00001, upper=0.1, default=1e-4, default_confidence="low")
+
+        # Data augmentation
         self.random_horizontal_flip_prob = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
         self.random_vertical_flip_prob = neps.Float(
@@ -54,6 +61,9 @@ class PipelineSpace:
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
             "epochs": self.epochs,
+
+            "scheduler": self.scheduler,
+
             "optimizer": self.optimizer,
             "momentum": self.momentum,
             "weight_dec_active": self.weight_dec_active,

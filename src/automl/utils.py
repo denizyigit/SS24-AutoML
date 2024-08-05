@@ -93,8 +93,10 @@ def get_optimizer(config, model):
 
 
 def train_epoch(
+        config: dict[str, Any],
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler.LRScheduler,
         criterion: nn.Module,
         train_loader: DataLoader,
         device: torch.device = torch.device("cpu")
@@ -113,6 +115,10 @@ def train_epoch(
         loss.backward()
         optimizer.step()
         loss_per_batch.append(loss.item())
+
+        # If the scheduler is oneCycleLR, step the scheduler on each batch
+        if config["scheduler"] == "oneCycleLR":
+            scheduler.step()
 
     mean_loss = np.mean(loss_per_batch)
 
@@ -162,43 +168,43 @@ def get_transform(
 ):
     # By default, resize the image to 224x224 because of MobileNetV2
     transform_list = [
-        transforms.Resize((224, 224)),
+        # transforms.Resize((224, 224)),
     ]
 
     # If the number of channels is not 3, convert the grayscale image to RGB
-    if num_channels is not None and num_channels != 3:
-        transform_list.append(GrayscaleToRGB())
+    # if num_channels is not None and num_channels != 3:
+    #     transform_list.append(GrayscaleToRGB())
 
-    if config:
-        # If config is given, return the transform with the specifig augmentations
-        transform_list.extend([
-            transforms.RandomHorizontalFlip(
-                p=config["random_horizontal_flip_prob"]
-            ),
-            transforms.RandomVerticalFlip(
-                p=config["random_vertical_flip_prob"]
-            ),
-            transforms.RandomApply([transforms.RandomRotation(
-                config["random_rotation_deg"])],
-                p=config["random_rotation_prob"]
-            ),
-            transforms.RandomApply(
-                [
-                    AddGaussianNoise(
-                        config["random_gaussian_noise_mean"],
-                        config["random_gaussian_noise_std"])
-                ],
-                p=config["random_gaussian_noise_prob"]
-            ),
-            transforms.RandomApply(
-                [
-                    transforms.ColorJitter(
-                        brightness=config["brightness"],
-                        contrast=config["contrast"],
-                        saturation=config["saturation"])
-                ], p=0.5
-            ),  # Assume a fixed probability for ColorJitter
-        ])
+    # if config:
+    #     # If config is given, return the transform with the specifig augmentations
+    #     transform_list.extend([
+    #         transforms.RandomHorizontalFlip(
+    #             p=config["random_horizontal_flip_prob"]
+    #         ),
+    #         transforms.RandomVerticalFlip(
+    #             p=config["random_vertical_flip_prob"]
+    #         ),
+    #         transforms.RandomApply([transforms.RandomRotation(
+    #             config["random_rotation_deg"])],
+    #             p=config["random_rotation_prob"]
+    #         ),
+    #         transforms.RandomApply(
+    #             [
+    #                 AddGaussianNoise(
+    #                     config["random_gaussian_noise_mean"],
+    #                     config["random_gaussian_noise_std"])
+    #             ],
+    #             p=config["random_gaussian_noise_prob"]
+    #         ),
+    #         transforms.RandomApply(
+    #             [
+    #                 transforms.ColorJitter(
+    #                     brightness=config["brightness"],
+    #                     contrast=config["contrast"],
+    #                     saturation=config["saturation"])
+    #             ], p=0.5
+    #         ),  # Assume a fixed probability for ColorJitter
+    #     ])
 
     transform_list.append(transforms.ToTensor())
     transform_list.append(transforms.Normalize(mean=mean, std=std))
@@ -257,3 +263,22 @@ def get_best_config_from_results(root_directory: str, num_process: int):
 
     # Save the absolute best config
     return absolute_best_config, absolute_best_loss, absolute_best_config_id
+
+
+def get_scheduler(config, optimizer, train_loader):
+    if config["scheduler"] == "reduceLROnPlateau":
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.1,
+            patience=10,
+            verbose=True
+        )
+    else:
+        return torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=1e-1,
+            epochs=config["epochs"],
+            steps_per_epoch=len(train_loader),
+            verbose=True
+        )

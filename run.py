@@ -16,7 +16,6 @@ import argparse
 
 import logging
 
-from src.automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
 
 logger = logging.getLogger(__name__)
 
