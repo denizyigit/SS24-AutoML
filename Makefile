@@ -40,7 +40,7 @@ format:
 	@echo "All good!"
 
 tblogger:
-	export TF_CPP_MIN_LOG_LEVEL=2 && tensorboard --logdir results_EmotionsDataset
+	export TF_CPP_MIN_LOG_LEVEL=2 && tensorboard --logdir results_emotions
 
 SHELL := /bin/bash
 

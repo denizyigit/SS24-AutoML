@@ -9,7 +9,7 @@ class PipelineSpace:
         self.learning_rate = neps.Float(
             lower=1e-6, upper=1e-1, log=True, default=1e-3, default_confidence="medium")
 
-        self.epochs = neps.Integer(lower=1, upper=3, is_fidelity=True)
+        self.epochs = neps.Integer(lower=1, upper=15, is_fidelity=True)
 
         self.optimizer = neps.Categorical(
             choices=["adam", "sgd"], default="adam", default_confidence="low")

@@ -160,18 +160,18 @@ def get_transform(
         std: float = 0.5,
         num_channels: int = None
 ):
-    # transform_list = [
-    #     transforms.ToTensor()
-    # ]
+    transform_list = [
+        transforms.Resize((224, 224)),
+    ]
 
-    # # If the number of channels is not 3, convert the grayscale image to RGB
-    # if num_channels is not None and num_channels != 3:
-    #     transform_list.append(GrayscaleToRGB())
+    # If the number of channels is not 3, convert the grayscale image to RGB
+    if num_channels is not None and num_channels != 3:
+        transform_list.append(GrayscaleToRGB())
 
     # if config:
     #     # If config is given, return the transform with the specifig augmentations
     #     transform_list.extend([
-    #         # transforms.Resize((224, 224)),
+    #         transforms.Resize((224, 224)),
     #         transforms.RandomHorizontalFlip(
     #             p=config["random_horizontal_flip_prob"]
     #         ),
@@ -200,12 +200,12 @@ def get_transform(
     #         ),  # Assume a fixed probability for ColorJitter
     #     ])
 
-    # transform_list.append(transforms.Normalize(mean=mean, std=std))
+    transform_list.append(transforms.ToTensor())
+    transform_list.append(transforms.Normalize(mean=mean, std=std))
 
-    transform_list = [
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ]
+    # transform_list = [
+    #     transforms.ToTensor(),
+    # ]
 
     return transforms.Compose(transform_list)
 

@@ -70,12 +70,6 @@ def target_function(**config):
     # Calculate mean and std of the training dataset
     mean_train, std_train = calculate_mean_std(dataset_train)
 
-    # Split train dataset into train and validation datasets
-    dataset_train, dataset_val = torch.utils.data.random_split(
-        dataset_train,
-        [0.8, 0.2]
-    )
-
     # Configure the transform for the dataset
     # TODO:
     # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
@@ -94,6 +88,12 @@ def target_function(**config):
         split='train',
         download=True,
         transform=transform
+    )
+
+    # Split train dataset into train and validation datasets
+    dataset_train, dataset_val = torch.utils.data.random_split(
+        dataset_train,
+        [0.8, 0.2]
     )
 
     # Reduce dataset size if needed for faster training
@@ -118,20 +118,7 @@ def target_function(**config):
     # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
     # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
 
-    model = DummyCNN(
-        input_channels=dataset_class.channels,
-        hidden_channels=30,
-        output_channels=dataset_class.num_classes,
-        image_width=dataset_class.width
-    )
-
-    # model = VGG16(
-    #     input_channels=self.dataset_class.channels,
-    #     output_channels=self.dataset_class.num_classes,
-    #     mean=self.mean_train,
-    #     std=self.std_train,
-    # )
-
+    model = MobileNet(output_channels=dataset_class.num_classes)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -150,8 +137,6 @@ def target_function(**config):
             train_loader=train_loader,
             device=device
         )
-        print(
-            f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}")
 
         # Evaluate the model on the validation set
         validation_loss, incorrect_images = evaluate_validation_epoch(
@@ -160,8 +145,9 @@ def target_function(**config):
             validation_loader=validation_loader,
             device=device
         )
+
         print(
-            f"PID_{config['pid']}: Epoch {epoch + 1}, Validation Loss: {validation_loss}")
+            f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}, Validation Loss: {validation_loss}")
 
         if (best_validation_loss is None or validation_loss < best_validation_loss):
             best_validation_loss = validation_loss
@@ -211,7 +197,7 @@ def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: 
         run_pipeline=target_function,
         pipeline_space=pipeline_space,
         root_directory=root_directory,
-        max_evaluations_total=6,
+        max_evaluations_total=20,
         overwrite_working_directory=False,
         post_run_summary=True,
         searcher={
@@ -276,7 +262,7 @@ class AutoML:
         self.std_train = None
 
         # Number of processes to run the optimization pipeline in parallel, default 1 means no parallelization
-        self.num_process = 2
+        self.num_process = 1
 
     def fit(self) -> AutoML:
         # Root directory for neps
@@ -350,12 +336,7 @@ class AutoML:
         train_loader = DataLoader(
             dataset_train, batch_size=int(self.best_config["batch_size"]), shuffle=True)
 
-        model = DummyCNN(
-            input_channels=dataset_class.channels,
-            hidden_channels=30,
-            output_channels=dataset_class.num_classes,
-            image_width=dataset_class.width
-        )
+        model = MobileNet(output_channels=dataset_class.num_classes)
         model.to(self.device)
 
         criterion = nn.CrossEntropyLoss()
