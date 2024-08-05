@@ -221,7 +221,7 @@ def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: 
             "eta": 3,
         },
         # Total cost, we use the time spent on evaluation as cost (seconds)
-        max_cost_total=20000,
+        max_cost_total=18000,
         task_id=f'PID_{pid}' if pid != -1 else None,
     )
 
