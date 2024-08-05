@@ -23,29 +23,190 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from neps.plot.tensorboard_eval import tblogger
 
+from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
 from src.automl.dummy_model import *
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_optimizer, get_transform, train_epoch
-from src.automl.pipeline_space import pipeline_space
+from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_dataset_class, get_optimizer, get_transform, train_epoch
+from src.automl.pipeline_space import PipelineSpace
 import time
 
 logger = logging.getLogger(__name__)
 
 
+# Define the target function for neps
+def target_function(**config):
+    # Calculate how much time is spent on the evaluation
+    # This is useful for multi-fidelity optimization
+    start_time = time.time()
+
+    random.seed(config["seed"])
+    np.random.seed(config["seed"])
+    torch.manual_seed(config["seed"])
+    torch.cuda.manual_seed(config["seed"])
+    # Ensure deterministic behavior in CuDNN
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu")
+
+    # *********************** PREPARE DATASETS ***********************
+    dataset_class = get_dataset_class(config["dataset"])
+
+    # Calculate mean and std of training dataset for normalization transforms, both for training and testing
+    # Then assign them to the class variables
+    dataset_train = dataset_class(
+        root="./data",
+        split='train',
+        download=True,
+        transform=transforms.ToTensor(),
+    )
+
+    # Reduce dataset size if needed for faster training
+    if config["reduced_dataset_ratio"] < 1.0:
+        dataset_train = create_reduced_dataset(
+            dataset_train, ratio=config["reduced_dataset_ratio"])
+
+    # Calculate mean and std of the training dataset
+    mean_train, std_train = calculate_mean_std(dataset_train)
+
+    # Split train dataset into train and validation datasets
+    dataset_train, dataset_val = torch.utils.data.random_split(
+        dataset_train,
+        [0.8, 0.2]
+    )
+
+    # Configure the transform for the dataset
+    # TODO:
+    # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
+    # 2. Apply the same transform composition in the final training as well (using self.best_config this time)
+    # 3. birden fazla architecture ismi ve parameteresi ( architecutre'ın width ve height size'ı gibi) eklenmeli, ona göre resize edilmeli
+    transform = get_transform(
+        config=config,
+        mean=mean_train,
+        std=std_train,
+        num_channels=dataset_class.channels
+    )
+
+    # Get train dataset with the defined transform
+    dataset_train = dataset_class(
+        root="./data",
+        split='train',
+        download=True,
+        transform=transform
+    )
+
+    # Reduce dataset size if needed for faster training
+    if config["reduced_dataset_ratio"] < 1.0:
+        dataset_train = create_reduced_dataset(
+            dataset_train, ratio=config["reduced_dataset_ratio"])
+
+    # Create data loaders for train and validation datasets
+    # TODO: Use batch_size from config
+    train_loader = DataLoader(
+        dataset_train, batch_size=int(config["batch_size"]), shuffle=True)
+
+    # TODO: Use batch_size from config
+    validation_loader = DataLoader(
+        dataset_val, batch_size=int(config["batch_size"]))
+
+    # TODO: Unused variable
+    # input_size = self.dataset_class.width * \
+    #     self.dataset_class.height * self.dataset_class.channels
+
+    # Create a CNN model
+    # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
+    # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
+
+    model = DummyCNN(
+        input_channels=dataset_class.channels,
+        hidden_channels=30,
+        output_channels=dataset_class.num_classes,
+        image_width=dataset_class.width
+    )
+
+    # model = VGG16(
+    #     input_channels=self.dataset_class.channels,
+    #     output_channels=self.dataset_class.num_classes,
+    #     mean=self.mean_train,
+    #     std=self.std_train,
+    # )
+
+    model.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Get optimizer based on the config
+    optimizer = get_optimizer(config, model)
+
+    # Train the model, calculate the training loss
+    best_validation_loss = None
+
+    for epoch in range(config["epochs"]):
+        training_loss = train_epoch(
+            optimizer=optimizer,
+            model=model,
+            criterion=criterion,
+            train_loader=train_loader,
+            device=device
+        )
+        logger.info(
+            f"Epoch {epoch + 1}, Training Loss: {training_loss}")
+
+        # Evaluate the model on the validation set
+        validation_loss, incorrect_images = evaluate_validation_epoch(
+            model=model,
+            criterion=criterion,
+            validation_loader=validation_loader,
+            device=device
+        )
+        logger.info(
+            f"Epoch {epoch + 1}, Validation Loss: {validation_loss}")
+
+        if (best_validation_loss is None or validation_loss < best_validation_loss):
+            best_validation_loss = validation_loss
+
+        ###################### Start Tensorboard Logging ######################
+        # The following tblogge` will result in:
+        # 1. Loss curves of each configuration at each epoch.
+        # 2. Decay curve of the learning rate at each epoch.
+        # 3. Wrongly classified images by the model.
+        # 4. First two layer gradients passed as scalar configs.
+        tblogger.log(
+            loss=validation_loss,
+            current_epoch=epoch,
+            # Set to `True` for a live loss trajectory for each config.
+            write_summary_incumbent=True,
+            writer_config_scalar=True,
+            writer_config_hparam=True,
+
+            extra_data={
+                "miss_img": tblogger.image_logging(image=incorrect_images, counter=2, seed=config["seed"]),
+            },
+        )
+        ###################### End Tensorboard Logging ######################
+
+    end_time = time.time()
+
+    print(
+        f"\nValidation loss: {best_validation_loss}, Time spent: {end_time - start_time} \n")
+
+    return {"loss": best_validation_loss, "cost": end_time - start_time}
+
+
 class AutoML:
 
-    def __init__(self, seed: int, dataset_class: VisionDataset, reduced_dataset_ratio: float = 1.0, max_evaluations_total=10) -> None:
+    def __init__(self, seed: int, dataset: str, reduced_dataset_ratio: float = 1.0, max_evaluations_total=10) -> None:
         self.seed = seed
 
-        self.model: nn.Module | None = None
+        self.best_model: nn.Module | None = None
         self.best_config = None
-        self.best_model_loss = None
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
 
         # Save the dataset class for later use
         # Use reduced_dataset_ratio to reduce the dataset size for faster training
-        self.dataset_class = dataset_class
+        self.dataset = dataset
         self.reduced_dataset_ratio = float(reduced_dataset_ratio)
         # self.max_evaluations_total = max_evaluations_total
 
@@ -54,172 +215,18 @@ class AutoML:
 
     def fit(self) -> AutoML:
         # Root directory for neps
-        root_directory = f"results_{self.dataset_class.__name__}"
+        root_directory = f"results_{self.dataset}"
 
         print(f"Cuda available: {torch.cuda.is_available()}")
-        print(
-            f"Training on dataset: {self.dataset_class.__name__}, type: {self.dataset_class.__class__})")
+        print(f"Training on dataset: {self.dataset}")
         print(
             f"Reduced dataset ratio: {self.reduced_dataset_ratio} is used for faster training.")
 
-        # Calculate mean and std of training dataset for normalization transforms, both for training and testing
-        # Then assign them to the class variables
-        dataset_train = self.dataset_class(
-            root="./data",
-            split='train',
-            download=True,
-            transform=transforms.ToTensor(),
+        pipeline_space = PipelineSpace().get_pipeline_space(
+            seed=self.seed,
+            dataset=self.dataset,
+            reduced_dataset_ratio=self.reduced_dataset_ratio,
         )
-
-        # Calculate mean and std of the training dataset
-        self.mean_train, self.std_train = calculate_mean_std(dataset_train)
-
-        # Split train dataset into train and validation datasets
-        dataset_train, dataset_val = torch.utils.data.random_split(
-            dataset_train,
-            [0.8, 0.2]
-        )
-
-        # Define the target function for neps
-        def target_function(**config):
-            # Calculate how much time is spent on the evaluation
-            # This is useful for multi-fidelity optimization
-            start_time = time.time()
-
-            random.seed(self.seed)
-            np.random.seed(self.seed)
-            torch.manual_seed(self.seed)
-            torch.cuda.manual_seed(self.seed)
-            # Ensure deterministic behavior in CuDNN
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
-
-            # Configure the transform for the dataset
-            # TODO:
-            # 1. Implement a more sophisticated transform with respect to the pipeline_space (e.g. data augmentation, normalization, etc.)
-            # 2. Apply the same transform composition in the final training as well (using self.best_config this time)
-            # 3. birden fazla architecture ismi ve parameteresi ( architecutre'ın width ve height size'ı gibi) eklenmeli, ona göre resize edilmeli
-            transform = get_transform(
-                config=config,
-                mean=self.mean_train,
-                std=self.std_train,
-                num_channels=self.dataset_class.channels
-            )
-
-            # Get train dataset with the defined transform
-            dataset_train = self.dataset_class(
-                root="./data",
-                split='train',
-                download=True,
-                transform=transform
-            )
-
-            # Reduce dataset size if needed for faster training
-            if self.reduced_dataset_ratio < 1.0:
-                dataset_train = create_reduced_dataset(
-                    dataset_train, ratio=self.reduced_dataset_ratio)
-
-            # Create data loaders for train and validation datasets
-            # TODO: Use batch_size from config
-            train_loader = DataLoader(
-                dataset_train, batch_size=64, shuffle=True)
-
-            # TODO: Use batch_size from config
-            validation_loader = DataLoader(
-                dataset_val, batch_size=64)
-
-            # TODO: Unused variable
-            input_size = self.dataset_class.width * \
-                self.dataset_class.height * self.dataset_class.channels
-
-            # Create a CNN model
-            # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
-            # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
-
-            model = DummyCNN(
-                input_channels=self.dataset_class.channels,
-                hidden_channels=30,
-                output_channels=self.dataset_class.num_classes,
-                image_width=self.dataset_class.width
-            )
-
-            # model = VGG16(
-            #     input_channels=self.dataset_class.channels,
-            #     output_channels=self.dataset_class.num_classes,
-            #     mean=self.mean_train,
-            #     std=self.std_train,
-            # )
-
-            model.to(self.device)
-
-            criterion = nn.CrossEntropyLoss()
-
-            # Get optimizer based on the config
-            optimizer = get_optimizer(config, model)
-
-            # Train the model, calculate the training loss
-            best_epoch_loss = None
-            for epoch in range(config["epochs"]):
-                training_loss = train_epoch(
-                    optimizer=optimizer,
-                    model=model,
-                    criterion=criterion,
-                    train_loader=train_loader,
-                    device=self.device
-                )
-                logger.info(
-                    f"Epoch {epoch + 1}, Training Loss: {training_loss}")
-
-                # Evaluate the model on the validation set
-                validation_loss, incorrect_images = evaluate_validation_epoch(
-                    model=model,
-                    criterion=criterion,
-                    validation_loader=validation_loader,
-                    device=self.device
-                )
-
-                logger.info(
-                    f"Epoch {epoch + 1}, Validation Loss: {validation_loss}")
-
-                # Save the validation_loss to best_epoch_loss
-                # If and only if it is the least loss encountered so far
-                if best_epoch_loss is None or validation_loss < best_epoch_loss:
-                    best_epoch_loss = validation_loss
-
-                # If best_epoch_loss is the least loss encountered so far
-                # Save the model as the best model to be used for predictions
-                if self.best_model_loss is None or best_epoch_loss < self.best_model_loss:
-                    self.best_model_loss = best_epoch_loss
-                    self.model = model  # 👈👈👈
-
-                ###################### Start Tensorboard Logging ######################
-
-                # The following tblogge` will result in:
-
-                # 1. Loss curves of each configuration at each epoch.
-                # 2. Decay curve of the learning rate at each epoch.
-                # 3. Wrongly classified images by the model.
-                # 4. First two layer gradients passed as scalar configs.
-                tblogger.log(
-                    loss=validation_loss,
-                    current_epoch=epoch,
-                    # Set to `True` for a live loss trajectory for each config.
-                    write_summary_incumbent=True,
-                    writer_config_scalar=True,
-                    writer_config_hparam=True,
-
-                    extra_data={
-                        "miss_img": tblogger.image_logging(image=incorrect_images, counter=2, seed=self.seed),
-                    },
-                )
-                ###################### End Tensorboard Logging ######################
-
-            end_time = time.time()
-
-            print(
-                f"\nBest epoch loss: {best_epoch_loss}, Time: {end_time - start_time}\n")
-
-            return {"loss": best_epoch_loss, "cost": end_time - start_time}
 
         # Run optimization pipeline with NEPS and save results to root_directory
         neps.run(
@@ -227,18 +234,16 @@ class AutoML:
             pipeline_space=pipeline_space,
             root_directory=root_directory,
             max_evaluations_total=3,
-            overwrite_working_directory=True,
+            overwrite_working_directory=False,
             post_run_summary=True,
             searcher={
                 "strategy": "priorband",
                 "eta": 3,
-                "initial_design_type": "max_budget",
             },
             # Total cost, we use the time spent on evaluation as cost (seconds)
             max_cost_total=1000,
         )
 
-        # ------------------ GET THE BEST CONFIG ------------------
         summary = neps.get_summary_dict(root_directory)
         best_config = summary["best_config"]
         best_config_id = summary["best_config_id"]
@@ -251,17 +256,88 @@ class AutoML:
         print(
             f"\t\t{best_config}\n\t\tLoss: {best_loss}\n\t\tConfig ID: {best_config_id}\n")
 
+        # ------------------ GET A FINAL MODEL WITH THE BEST CONFIG ------------------
+        print("\n\tTRAINING A FINAL MODEL WITH THE BEST CONFIG\n")
+        dataset_class = get_dataset_class(self.dataset)
+
+        dataset_train = dataset_class(
+            root="./data",
+            split='train',
+            download=True,
+            transform=transforms.ToTensor(),
+        )
+
+        # Reduce dataset size if needed for faster training
+        if self.best_config["reduced_dataset_ratio"] < 1.0:
+            dataset_train = create_reduced_dataset(
+                dataset_train, ratio=self.best_config["reduced_dataset_ratio"])
+
+        # Calculate mean and std of the training dataset
+        self.mean_train, self.std_train = calculate_mean_std(dataset_train)
+
+        # Configure the transform for the dataset
+        transform = get_transform(
+            config=self.best_config,
+            mean=self.mean_train,
+            std=self.std_train,
+            num_channels=dataset_class.channels
+        )
+
+        # Get train dataset with the defined transform
+        dataset_train = dataset_class(
+            root="./data",
+            split='train',
+            download=True,
+            transform=transform
+        )
+
+        if self.reduced_dataset_ratio < 1.0:
+            dataset_train = create_reduced_dataset(
+                dataset_train, ratio=self.reduced_dataset_ratio)
+
+        train_loader = DataLoader(
+            dataset_train, batch_size=int(self.best_config["batch_size"]), shuffle=True)
+
+        model = DummyCNN(
+            input_channels=dataset_class.channels,
+            hidden_channels=30,
+            output_channels=dataset_class.num_classes,
+            image_width=dataset_class.width
+        )
+        model.to(self.device)
+
+        criterion = nn.CrossEntropyLoss()
+
+        optimizer = get_optimizer(self.best_config, model)
+
+        # Train the model, calculate the training loss
+        for epoch in range(self.best_config["epochs"]):
+            training_loss = train_epoch(
+                optimizer=optimizer,
+                model=model,
+                criterion=criterion,
+                train_loader=train_loader,
+                device=self.device
+            )
+            logger.info(
+                f"Epoch {epoch + 1}, Training Loss: {training_loss}")
+
+        # Save the final model to be used for predictions
+        self.best_model = model
+
         return self
 
     def predict(self) -> Tuple[np.ndarray, np.ndarray]:
         # Configure the transform for the test dataset, without data augmentation
+        dataset_class = get_dataset_class(self.dataset)
+
         transform = get_transform(
             mean=self.mean_train,
             std=self.std_train,
-            num_channels=self.dataset_class.channels
+            num_channels=dataset_class.channels
         )
 
-        dataset_test = self.dataset_class(
+        dataset_test = dataset_class(
             root="./data",
             split='test',
             download=True,
@@ -277,11 +353,11 @@ class AutoML:
             dataset_test, batch_size=100, shuffle=False)
         predictions = []
         labels = []
-        self.model.eval()
+        self.best_model.eval()
         with torch.no_grad():
             for data, target in data_loader:
                 data, target = data.to(self.device), target.to(self.device)
-                output = self.model(data)
+                output = self.best_model(data)
                 predicted = torch.argmax(output, 1)
                 labels.append(target.to("cpu").numpy())
                 predictions.append(predicted.to("cpu").numpy())

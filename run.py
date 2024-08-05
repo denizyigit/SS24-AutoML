@@ -28,23 +28,13 @@ def main(
         reduced_dataset_ratio: float,
         # max_evaluations_total: int
 ):
-    match dataset:
-        case "fashion":
-            dataset_class = FashionDataset
-        case "flowers":
-            dataset_class = FlowersDataset
-        case "emotions":
-            dataset_class = EmotionsDataset
-        case _:
-            raise ValueError(f"Invalid dataset: {args.dataset}")
-
     logger.info("Fitting AutoML")
 
     # You do not need to follow this setup or API it's merely here to provide
     # an example of how your automl system could be used.
     # As a general rule of thumb, you should **never** pass in any
     # test data to your AutoML solution other than to generate predictions.
-    automl = AutoML(seed=seed, dataset_class=dataset_class,
+    automl = AutoML(seed=seed, dataset=dataset,
                     reduced_dataset_ratio=reduced_dataset_ratio)
     # load the dataset and create a loader then pass it
     automl.fit()
@@ -139,5 +129,5 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         reduced_dataset_ratio=args.reduced_dataset_ratio,
-        #max_evaluations_total=args.max_evaluations_total
+        # max_evaluations_total=args.max_evaluations_total
     )

@@ -8,6 +8,8 @@ from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
+from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
+
 
 class GrayscaleToRGB:
     """Convert a grayscale image to RGB by duplicating the single channel."""
@@ -204,3 +206,15 @@ def get_transform(
     ]
 
     return transforms.Compose(transform_list)
+
+
+def get_dataset_class(dataset: str):
+    match dataset:
+        case "fashion":
+            return FashionDataset
+        case "flowers":
+            return FlowersDataset
+        case "emotions":
+            return EmotionsDataset
+        case _:
+            raise ValueError(f"Invalid dataset: {dataset}")
