@@ -70,14 +70,18 @@ class AutoML:
             download=True,
             transform=transforms.ToTensor(),
         )
+
+        # Calculate mean and std of the training dataset
         self.mean_train, self.std_train = calculate_mean_std(dataset_train)
+
+        # Split train dataset into train and validation datasets
+        dataset_train, dataset_val = torch.utils.data.random_split(
+            dataset_train,
+            [0.8, 0.2]
+        )
 
         # Define the target function for neps
         def target_function(**config):
-            print("\n------------------")
-            print("Evaluation with config:")
-            print(config)
-
             # Calculate how much time is spent on the evaluation
             # This is useful for multi-fidelity optimization
             start_time = time.time()
@@ -114,12 +118,6 @@ class AutoML:
             if self.reduced_dataset_ratio < 1.0:
                 dataset_train = create_reduced_dataset(
                     dataset_train, ratio=self.reduced_dataset_ratio)
-
-            # Split train dataset into train and validation datasets
-            dataset_train, dataset_val = torch.utils.data.random_split(
-                dataset_train,
-                [0.8, 0.2]
-            )
 
             # Create data loaders for train and validation datasets
             # TODO: Use batch_size from config
