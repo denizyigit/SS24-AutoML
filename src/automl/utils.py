@@ -9,6 +9,13 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
 
+class GrayscaleToRGB:
+    """Convert a grayscale image to RGB by duplicating the single channel."""
+
+    def __call__(self, image):
+        return image.convert('RGB')
+
+
 class AddGaussianNoise(object):
     def __init__(self, mean=0.0, std=1.0):
         self.mean = mean
@@ -93,8 +100,7 @@ def train_epoch(
     """
     loss_per_batch = []
     model.train()
-    train_loader.dataset.transform = transforms.Compose([
-        transforms.Resize((224, 224)), transforms.ToTensor()])
+
     for _, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -147,20 +153,21 @@ def evaluate_validation_epoch(
 def get_transform(
         config: dict[str, Any] = None,
         mean: float = 0.5,
-        std: float = 0.5
+        std: float = 0.5,
+        num_channels: int = None
 ):
-    if not config:
-        # If config is not given, return the default transform.
-        transform = transforms.Compose([
+    transform_list = [
+        transforms.ToTensor()
+    ]
+
+    # If the number of channels is not 3, convert the grayscale image to RGB
+    if num_channels is not None and num_channels != 3:
+        transform_list.append(GrayscaleToRGB())
+
+    if config:
+        # If config is given, return the transform with the specifig augmentations
+        transform_list.extend([
             # transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean, std=std)
-        ])
-    else:
-        # If config is given, return the transform with the specified parameters
-        transform = transforms.Compose([
-            # transforms.Resize((224, 224)),
-            transforms.ToTensor(),
             transforms.RandomHorizontalFlip(
                 p=config["random_horizontal_flip_prob"]
             ),
@@ -187,7 +194,8 @@ def get_transform(
                         saturation=config["saturation"])
                 ], p=0.5
             ),  # Assume a fixed probability for ColorJitter
-            transforms.Normalize(mean=mean, std=std)
         ])
 
-    return transform
+    transform_list.append(transforms.Normalize(mean=mean, std=std))
+
+    return transforms.Compose(transform_list)

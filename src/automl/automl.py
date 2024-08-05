@@ -99,6 +99,7 @@ class AutoML:
                 config=config,
                 mean=self.mean_train,
                 std=self.std_train,
+                num_channels=self.dataset_class.channels
             )
 
             # Get train dataset with the defined transform
@@ -259,6 +260,7 @@ class AutoML:
         transform = get_transform(
             mean=self.mean_train,
             std=self.std_train,
+            num_channels=self.dataset_class.channels
         )
 
         dataset_test = self.dataset_class(
