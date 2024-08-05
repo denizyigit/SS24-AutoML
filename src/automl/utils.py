@@ -1,6 +1,8 @@
+import os
 import random
 from typing import Any, Tuple
 
+import neps
 import numpy as np
 import torch
 import torch.nn as nn
@@ -218,3 +220,29 @@ def get_dataset_class(dataset: str):
             return EmotionsDataset
         case _:
             raise ValueError(f"Invalid dataset: {dataset}")
+
+
+def get_best_config_from_results(root_directory: str, num_processes: int):
+    absolute_best_config = None
+    absolute_best_loss = float("inf")
+    absolute_best_config_id = None
+
+    # Iterate over each subdirectory
+    for subdirectory_index in range(num_processes):
+        subdirectory_path = os.path.join(
+            root_directory, f"task_PID_{subdirectory_index}")
+
+        # Get the summary dictionary from the current subdirectory
+        summary = neps.get_summary_dict(subdirectory_path)
+        best_config = summary["best_config"]
+        best_config_id = summary["best_config_id"]
+        best_loss = summary["best_loss"]
+
+    # Compare and update the absolute best configuration
+    if best_loss < absolute_best_loss:
+        absolute_best_config = best_config
+        absolute_best_loss = best_loss
+        absolute_best_config_id = best_config_id
+
+    # Save the absolute best config
+    return absolute_best_config, absolute_best_loss, absolute_best_config_id
