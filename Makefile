@@ -33,7 +33,7 @@ run:
 		--dataset $(dataset) \
 		--seed 42 \
 		--output-path preds-42-$(dataset).npy \
-		--reduced-dataset-ratio 0.1 \
+		--reduced-dataset-ratio 1 \
 		--max-evaluations-total 18 \
 		--max-epochs 15 \
 		--num-process 1
