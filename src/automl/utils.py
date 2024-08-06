@@ -9,8 +9,9 @@ import torch.nn as nn
 from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
-
+from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
+from automl.scheduler_wrapper import LRSchedulerWrapper
 
 
 class GrayscaleToRGB:
@@ -266,19 +267,23 @@ def get_best_config_from_results(root_directory: str, num_process: int):
 
 
 def get_scheduler(config, optimizer, train_loader):
+    scheduler = None
+
     if config["scheduler"] == "reduceLROnPlateau":
-        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+        scheduler = ReduceLROnPlateau(
             optimizer,
             mode="min",
             factor=0.1,
-            patience=5,
-            verbose=True
+            patience=2,
+            # verbose=True # deprecated, use our own wrapper to log learning rate updates
         )
     else:
-        return torch.optim.lr_scheduler.OneCycleLR(
+        scheduler = OneCycleLR(
             optimizer,
             max_lr=1e-1,
             epochs=config["epochs"],
             steps_per_epoch=len(train_loader),
-            verbose=True
+            # verbose=True # deprecated, use our own wrapper to log learning rate updates
         )
+
+    return LRSchedulerWrapper(scheduler, verbose=True, config=config)
