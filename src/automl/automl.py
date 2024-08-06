@@ -60,14 +60,13 @@ def target_function(**config):
         root="./data",
         split='train',
         download=True,
-        transform=transforms.ToTensor()
-        # if dataset_class.channels == 3 else
-        # transforms.Compose(
-        #     [
-        #         GrayscaleToRGB(),
-        #         transforms.ToTensor()
-        #     ]
-        # ),
+        transform=transforms.ToTensor() if dataset_class.channels == 3 else
+        transforms.Compose(
+            [
+                GrayscaleToRGB(),
+                transforms.ToTensor()
+            ]
+        ),
     )
 
     # Reduce dataset size if needed for faster training
@@ -126,13 +125,13 @@ def target_function(**config):
     # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
     # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
 
-    # model = MobileNet(output_channels=dataset_class.num_classes)
-    model = DummyCNN(
-        input_channels=dataset_class.channels,
-        hidden_channels=30,
-        output_channels=dataset_class.num_classes,
-        image_width=dataset_class.width
-    )
+    model = MobileNet(output_channels=dataset_class.num_classes)
+    # model = DummyCNN(
+    #     input_channels=dataset_class.channels,
+    #     hidden_channels=30,
+    #     output_channels=dataset_class.num_classes,
+    #     image_width=dataset_class.width
+    # )
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -222,13 +221,14 @@ def target_function(**config):
 # Each processor will run the optimization pipeline with NEPS in parallel
 
 
-def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
+def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str, max_evaluations_total: int, max_epochs: int):
     # Get the pipeline space for the optimization
     pipeline_space = PipelineSpace().get_pipeline_space(
         pid=pid,
         seed=seed,
         dataset=dataset,
         reduced_dataset_ratio=reduced_dataset_ratio,
+        max_epochs=max_epochs
     )
 
     # Run optimization pipeline with NEPS and save results to root_directory
@@ -236,7 +236,7 @@ def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: 
         run_pipeline=target_function,
         pipeline_space=pipeline_space,
         root_directory=root_directory,
-        max_evaluations_total=20,
+        max_evaluations_total=max_evaluations_total,
         overwrite_working_directory=False,
         post_run_summary=True,
         searcher={
@@ -244,12 +244,12 @@ def neps_run_pipeline(pid: int, seed: int, dataset: str, reduced_dataset_ratio: 
             "eta": 3,
         },
         # Total cost, we use the time spent on evaluation as cost (seconds)
-        max_cost_total=1000,
+        max_cost_total=14400,
         task_id=f'PID_{pid}' if pid != -1 else None,
     )
 
 
-def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str):
+def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, reduced_dataset_ratio: float, root_directory: str, max_evaluations_total: int, max_epochs: int):
     if num_process > 1:
         # Create multiple processes to run the optimization pipeline in parallel
         processes = []
@@ -262,6 +262,8 @@ def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, 
                     dataset,
                     reduced_dataset_ratio,
                     root_directory,
+                    max_evaluations_total,
+                    max_epochs,
                 )
             )
             p.start()
@@ -276,7 +278,9 @@ def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, 
             seed,
             dataset,
             reduced_dataset_ratio,
-            root_directory
+            root_directory,
+            max_evaluations_total,
+            max_epochs
         )
 
 
@@ -295,13 +299,14 @@ class AutoML:
         # Use reduced_dataset_ratio to reduce the dataset size for faster training
         self.dataset = dataset
         self.reduced_dataset_ratio = float(reduced_dataset_ratio)
-        # self.max_evaluations_total = max_evaluations_total
 
         self.mean_train = None
         self.std_train = None
 
         # Number of processes to run the optimization pipeline in parallel, default 1 means no parallelization
-        self.num_process = 1
+        self.max_evaluations_total = max_evaluations_total
+        self.num_process = num_process
+        self.max_epochs = max_epochs
 
     def fit(self) -> AutoML:
         # Root directory for neps
@@ -317,7 +322,9 @@ class AutoML:
             self.seed,
             self.dataset,
             self.reduced_dataset_ratio,
-            root_directory
+            root_directory,
+            self.max_evaluations_total,
+            self.max_epochs
         )
 
         # ------------------ GET THE BEST CONFIG FROM RESULTS ------------------
@@ -375,13 +382,13 @@ class AutoML:
         train_loader = DataLoader(
             dataset_train, batch_size=int(self.best_config["batch_size"]), shuffle=True)
 
-        # model = MobileNet(output_channels=dataset_class.num_classes)
-        model = DummyCNN(
-            input_channels=dataset_class.channels,
-            hidden_channels=30,
-            output_channels=dataset_class.num_classes,
-            image_width=dataset_class.width
-        )
+        model = MobileNet(output_channels=dataset_class.num_classes)
+        # model = DummyCNN(
+        #     input_channels=dataset_class.channels,
+        #     hidden_channels=30,
+        #     output_channels=dataset_class.num_classes,
+        #     image_width=dataset_class.width
+        # )
         model.to(self.device)
 
         criterion = nn.CrossEntropyLoss()

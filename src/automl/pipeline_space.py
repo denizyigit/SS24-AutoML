@@ -9,7 +9,8 @@ class PipelineSpace:
         self.learning_rate = neps.Float(
             lower=1e-6, upper=1e-1, log=True, default=1e-3, default_confidence="medium")
 
-        self.epochs = neps.Integer(lower=1, upper=15, is_fidelity=True)
+        # To be determined later by command line arguments
+        self.epochs = None
 
         # Scheduler
         self.scheduler = neps.Categorical(
@@ -49,7 +50,7 @@ class PipelineSpace:
         self.saturation = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
 
-    def get_pipeline_space(self, pid, seed,  dataset, reduced_dataset_ratio):
+    def get_pipeline_space(self, pid, seed,  dataset, reduced_dataset_ratio, max_epochs):
         return {
             # Constant values
             "pid": neps.Constant(value=pid),
@@ -60,7 +61,7 @@ class PipelineSpace:
             # Hyperparameters
             "batch_size": self.batch_size,
             "learning_rate": self.learning_rate,
-            "epochs": self.epochs,
+            "epochs": neps.Integer(lower=1, upper=max_epochs, is_fidelity=True),
 
             "scheduler": self.scheduler,
 
