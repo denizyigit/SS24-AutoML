@@ -60,13 +60,14 @@ def target_function(**config):
         root="./data",
         split='train',
         download=True,
-        transform=transforms.ToTensor() if dataset_class.channels == 3 else
-            transforms.Compose(
-                [
-                    GrayscaleToRGB(),
-                    transforms.ToTensor()
-                ]
-            ),
+        transform=transforms.ToTensor()
+        # if dataset_class.channels == 3 else
+        # transforms.Compose(
+        #     [
+        #         GrayscaleToRGB(),
+        #         transforms.ToTensor()
+        #     ]
+        # ),
     )
 
     # Reduce dataset size if needed for faster training
