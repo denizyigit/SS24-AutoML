@@ -1,6 +1,6 @@
 """
 This module contains the datasets used in the AutoML exam.
-If you want to edit this file be aware that we will later 
+If you want to edit this file be aware that we will later
   push the test set to this file which might cause problems.
 
 """
@@ -27,16 +27,17 @@ class BaseVisionDataset(VisionDataset):
         split: string (optional)
             The dataset split, supports `train` (default), `val`, or `test`.
         transform: callable (optional)
-            A function/transform that takes in a PIL image and returns a transformed version. 
+            A function/transform that takes in a PIL image and returns a transformed version.
             E.g, `transforms.RandomCrop`.
         target_transform: callable (optional)
             A function/transform that takes in the target and transforms it.
         download: bool (optional)
-            If true, downloads the dataset from the internet and puts it in root directory. 
+            If true, downloads the dataset from the internet and puts it in root directory.
             If dataset is already downloaded, it is not downloaded again.
     """
     _download_url_prefix = BASE_URL
-    _download_file = Tuple[str, str] # Checksum that is provided here is not used.
+    # Checksum that is provided here is not used.
+    _download_file = Tuple[str, str]
     _dataset_name: str
     _md5_train: str
     _md5_test: str
@@ -100,13 +101,15 @@ class BaseVisionDataset(VisionDataset):
 
     def __getitem__(self, idx: int) -> Tuple[Any, Any]:
         image_file, label = self._image_files[idx], self._labels[idx]
-        image = PIL.Image.open(self._base_folder / f"images_{self._split}" / image_file)
+        image = PIL.Image.open(self._base_folder /
+                               f"images_{self._split}" / image_file)
         if self.channels == 1:
             image = image.convert("L")
         elif self.channels == 3:
             image = image.convert("RGB")
         else:
-            raise ValueError(f"Unsupported number of channels: {self.channels}")
+            raise ValueError(
+                f"Unsupported number of channels: {self.channels}")
 
         if self.transform:
             image = self.transform(image)
@@ -164,3 +167,22 @@ class FashionDataset(BaseVisionDataset):
     height = 28
     channels = 1
     num_classes = 10
+
+
+class SkinCancerDataset(BaseVisionDataset):
+    """SkinCancer Dataset.
+    The SkinCancer dataset contains images of skin lesions. The task is to classify what kind of skin lesion it is.
+
+    This is the test dataset for the AutoML exam.  It does not contain the labels for the test split.
+    You are expected to predict these labels and save them to a file called `final_test_preds.npy` for your
+    final submission.
+    """
+
+    _download_file = ("skin_cancer.tgz", "cf807a5c6c29ea1d97e660abb3be88ad")
+    _dataset_name = "skin_cancer"
+    _md5_train = "ac619f9de4defd5babc322fbc400907b"
+    _md5_test = "7a5c1f129e2c837e410081dbf68424f9"
+    width = 450
+    height = 450
+    channels = 3
+    num_classes = 7

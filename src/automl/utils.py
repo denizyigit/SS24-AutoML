@@ -10,7 +10,7 @@ from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
-from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
+from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset, SkinCancerDataset
 from automl.scheduler_wrapper import LRSchedulerWrapper
 
 
@@ -222,6 +222,8 @@ def get_dataset_class(dataset: str):
             return FlowersDataset
         case "emotions":
             return EmotionsDataset
+        case "skin_cancer":
+            return SkinCancerDataset
         case _:
             raise ValueError(f"Invalid dataset: {dataset}")
 

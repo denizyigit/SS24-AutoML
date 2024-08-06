@@ -61,6 +61,14 @@ def main(
     with output_path.open("wb") as f:
         np.save(f, test_preds)
 
+    # In case of running on the test data, also add the predictions.npy
+    # to the correct location for autoevaluation.
+    if dataset == "skin_cancer":
+        test_output_path = Path("data/exam_dataset/predictions.npy")
+        test_output_path.parent.mkdir(parents=True, exist_ok=True)
+        with test_output_path.open("wb") as f:
+            np.save(f, test_preds)
+
     # Calculate the top-1 and top-5 accuracy score of the model on the test set
     if not np.isnan(test_labels).any():
         acc_top_1 = top_k_accuracy_score(test_labels, test_preds, k=1, labels=range(
@@ -104,7 +112,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="The name of the dataset to run on.",
-        choices=["fashion", "flowers", "emotions"]
+        choices=["fashion", "flowers", "emotions", "skin_cancer"]
     )
     parser.add_argument(
         "--output-path",
