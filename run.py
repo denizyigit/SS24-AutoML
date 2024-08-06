@@ -9,7 +9,7 @@ to a file, which we will grade using github classrooms!
 from __future__ import annotations
 
 from pathlib import Path
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, top_k_accuracy_score
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, f1_score, precision_score, recall_score, top_k_accuracy_score
 import numpy as np
 from automl.utils import get_dataset_class
 from src.automl.automl import AutoML
@@ -20,6 +20,13 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+def plot_confusion_matrix(cm, class_names):
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                                  display_labels=class_names)
+    disp.plot()
+    plt.show()
 
 
 def main(
@@ -66,8 +73,13 @@ def main(
         logger.info(f"Top 5 Accuracy on test set: {acc_top_5}")
 
         test_preds_labels = np.argmax(test_preds, axis=1)
-        conf_matrix = confusion_matrix(test_labels, test_preds_labels)
-        logger.info(f"Confusion Matrix:\n{conf_matrix}")
+
+        # Plot confusion matrix
+        cm = confusion_matrix(test_labels, test_preds_labels)
+        class_names = range(get_dataset_class(dataset).num_classes)
+        plot_confusion_matrix(cm, class_names)
+        logger.info(
+            f"Confusion matrix saved to {'confusion_matrix.png'}")
 
         # Precision, Recall, and F1-Score
         precision = precision_score(
@@ -79,13 +91,6 @@ def main(
         logger.info(f"Recall: {recall}")
         logger.info(f"F1 Score: {f1}")
 
-        # Plotting Confusion Matrix
-        plt.figure(figsize=(10, 7))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-        plt.xlabel('Predicted')
-        plt.ylabel('True')
-        plt.title('Confusion Matrix')
-        plt.show()
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         logger.info(f"No test split for dataset '{dataset}'")
