@@ -19,7 +19,7 @@ class EarlyStopping:
             self.counter += 1
             if self.verbose:
                 print(
-                    f"PID_{self.pid}:EarlyStopping: Validation score increased! Counter: {self.counter}/{self.patience}")
+                    f"PID_{self.pid}:EarlyStopping: Validation loss increased! Counter: {self.counter}/{self.patience}")
             if self.counter >= self.patience:
                 print(f"PID_{self.pid}:EarlyStopping: Stopping training!")
                 self.early_stop = True

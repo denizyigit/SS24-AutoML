@@ -25,6 +25,7 @@ from torchvision import transforms
 from neps.plot.tensorboard_eval import tblogger
 
 from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
+from automl.early_stopping import EarlyStopping
 from src.automl.dummy_model import *
 from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_scheduler, get_transform, train_epoch
 from src.automl.pipeline_space import PipelineSpace
@@ -135,6 +136,13 @@ def target_function(**config):
     # LR scheduler
     scheduler = get_scheduler(config, optimizer, train_loader)
 
+    early_stopping = EarlyStopping(
+        patience=7,
+        delta=0,
+        verbose=True,
+        pid=config["pid"]
+    )
+
     # Train the model, calculate the training loss
     best_validation_loss = None
 
@@ -156,6 +164,12 @@ def target_function(**config):
             validation_loader=validation_loader,
             device=device
         )
+
+        # Check if early stopping is needed
+        early_stopping(validation_loss)
+
+        if early_stopping.early_stop:
+            break
 
         # If the scheduler is reduceLROnPlateau, step the scheduler on each epoch
         if config["scheduler"] == "reduceLROnPlateau":

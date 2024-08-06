@@ -271,7 +271,7 @@ def get_scheduler(config, optimizer, train_loader):
             optimizer,
             mode="min",
             factor=0.1,
-            patience=10,
+            patience=5,
             verbose=True
         )
     else:
