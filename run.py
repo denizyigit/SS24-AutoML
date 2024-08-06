@@ -83,8 +83,8 @@ def main(
         test_preds_labels = np.argmax(test_preds, axis=1)
 
         # Plot confusion matrix
-        cm = confusion_matrix(test_labels, test_preds_labels)
         class_names = range(get_dataset_class(dataset).num_classes)
+        cm = confusion_matrix(test_labels, test_preds_labels, labels=class_names)
         plot_confusion_matrix(cm, class_names)
         logger.info(
             f"Confusion matrix saved to {'confusion_matrix.png'}")
