@@ -163,6 +163,3 @@ cython_debug/
 **/.DS_Store
 
 data/
-
-results_*
-*.npy
