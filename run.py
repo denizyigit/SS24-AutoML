@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, top_k_accuracy_score
 import numpy as np
+from automl.utils import get_dataset_class
 from src.automl.automl import AutoML
 import argparse
 import matplotlib.pyplot as plt
@@ -55,8 +56,10 @@ def main(
 
     # Calculate the top-1 and top-5 accuracy score of the model on the test set
     if not np.isnan(test_labels).any():
-        acc_top_1 = top_k_accuracy_score(test_labels, test_preds, k=1)
-        acc_top_5 = top_k_accuracy_score(test_labels, test_preds, k=5)
+        acc_top_1 = top_k_accuracy_score(test_labels, test_preds, k=1, labels=range(
+            get_dataset_class(dataset).num_classes))
+        acc_top_5 = top_k_accuracy_score(test_labels, test_preds, k=5, labels=range(
+            get_dataset_class(dataset).num_classes))
 
         print(f"Test labels length: {len(test_labels)}")
         logger.info(f"Top 1 Accuracy on test set: {acc_top_1}")
