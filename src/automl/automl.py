@@ -27,7 +27,7 @@ from neps.plot.tensorboard_eval import tblogger
 from automl.datasets import EmotionsDataset, FashionDataset, FlowersDataset
 from automl.early_stopping import EarlyStopping
 from src.automl.dummy_model import *
-from src.automl.utils import calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_scheduler, get_transform, train_epoch
+from src.automl.utils import GrayscaleToRGB, calculate_mean_std, create_reduced_dataset, evaluate_validation_epoch, get_best_config_from_results, get_dataset_class, get_optimizer, get_scheduler, get_transform, train_epoch
 from src.automl.pipeline_space import PipelineSpace
 import time
 
@@ -60,7 +60,13 @@ def target_function(**config):
         root="./data",
         split='train',
         download=True,
-        transform=transforms.ToTensor(),
+        transform=transforms.ToTensor() if dataset_class.channels == 3 else
+            transforms.Compose(
+                [
+                    GrayscaleToRGB(),
+                    transforms.ToTensor()
+                ]
+            ),
     )
 
     # Reduce dataset size if needed for faster training
