@@ -169,35 +169,35 @@ def get_transform(
 ):
     # By default, resize the image to 224x224 because of MobileNetV2
     transform_list = [
-        # transforms.Resize((224, 224)),
+        transforms.Resize((224, 224)),
     ]
 
     # If the number of channels is not 3, convert the grayscale image to RGB
-    # if num_channels is not None and num_channels != 3:
-    #     transform_list.append(GrayscaleToRGB())
+    if num_channels is not None and num_channels != 3:
+        transform_list.append(GrayscaleToRGB())
 
-    # if config:
-    #     # If config is given, return the transform with the specifig augmentations
-    #     transform_list.extend([
-    #         transforms.RandomHorizontalFlip(
-    #             p=config["random_horizontal_flip_prob"]
-    #         ),
-    #         transforms.RandomVerticalFlip(
-    #             p=config["random_vertical_flip_prob"]
-    #         ),
-    #         # transforms.RandomApply([transforms.RandomRotation(
-    #         #     config["random_rotation_deg"])],
-    #         #     p=config["random_rotation_prob"]
-    #         # ),
-    #         # transforms.RandomApply(
-    #         #     [
-    #         #         transforms.ColorJitter(
-    #         #             brightness=config["brightness"],
-    #         #             contrast=config["contrast"],
-    #         #             saturation=config["saturation"])
-    #         #     ], p=0.5
-    #         # ),  # Assume a fixed probability for ColorJitter
-    #     ])
+    if config:
+        # If config is given, return the transform with the specifig augmentations
+        transform_list.extend([
+            transforms.RandomHorizontalFlip(
+                p=config["random_horizontal_flip_prob"]
+            ),
+            transforms.RandomVerticalFlip(
+                p=config["random_vertical_flip_prob"]
+            ),
+            # transforms.RandomApply([transforms.RandomRotation(
+            #     config["random_rotation_deg"])],
+            #     p=config["random_rotation_prob"]
+            # ),
+            # transforms.RandomApply(
+            #     [
+            #         transforms.ColorJitter(
+            #             brightness=config["brightness"],
+            #             contrast=config["contrast"],
+            #             saturation=config["saturation"])
+            #     ], p=0.5
+            # ),  # Assume a fixed probability for ColorJitter
+        ])
 
     transform_list.append(transforms.ToTensor())
     transform_list.append(transforms.Normalize(mean=mean, std=std))
