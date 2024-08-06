@@ -28,7 +28,15 @@ install:
 	pip install -e .
 
 run:
-	export TF_CPP_MIN_LOG_LEVEL=2 && python run.py --dataset emotions --seed 42 --output-path preds-42-emotions.npy --reduced-dataset-ratio 0.1 --max-evaluations-total 5
+	export TF_CPP_MIN_LOG_LEVEL=2 && \
+	python run.py \
+		--dataset emotions \
+		--seed 42 \
+		--output-path preds-42-emotions.npy \
+		--reduced-dataset-ratio 0.1 \
+		--max-evaluations-total 18
+		--max_epochs 15
+		--num-process 1
 
 check:
 	pycodestyle --max-line-length=120 src
