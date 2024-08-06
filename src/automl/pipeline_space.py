@@ -17,7 +17,7 @@ class PipelineSpace:
 
         #  Optimizer
         self.optimizer = neps.Categorical(
-            choices=["adam", "sgd"], default="adam", default_confidence="low")
+            choices=["adam", "sgd"], default="adam", default_confidence="medium")
         self.momentum = neps.Float(
             lower=0.1, upper=0.999, default=0.4, default_confidence="low")
         self.weight_dec_active = neps.Categorical(
@@ -29,7 +29,7 @@ class PipelineSpace:
 
         # Data augmentation
         self.random_horizontal_flip_prob = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+            lower=0.0, upper=1.0, default=0.5, default_confidence="medium")
         self.random_vertical_flip_prob = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
         self.random_rotation_deg = neps.Integer(
@@ -37,7 +37,7 @@ class PipelineSpace:
         self.random_rotation_prob = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
         self.random_gaussian_noise_mean = neps.Float(
-            lower=0.0, upper=1.0, default=0.0, default_confidence="low")
+            lower=0.0, upper=1.0, default=0.0, default_confidence="medium")
         self.random_gaussian_noise_std = neps.Float(
             lower=0.0, upper=1.0, default=0.1, default_confidence="low")
         self.random_gaussian_noise_prob = neps.Float(

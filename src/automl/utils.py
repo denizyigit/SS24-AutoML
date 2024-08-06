@@ -6,6 +6,7 @@ import neps
 import numpy as np
 import torch
 import torch.nn as nn
+import torchvision.transforms.v2
 from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
@@ -190,14 +191,6 @@ def get_transform(
             ),
             transforms.RandomApply(
                 [
-                    AddGaussianNoise(
-                        config["random_gaussian_noise_mean"],
-                        config["random_gaussian_noise_std"])
-                ],
-                p=config["random_gaussian_noise_prob"]
-            ),
-            transforms.RandomApply(
-                [
                     transforms.ColorJitter(
                         brightness=config["brightness"],
                         contrast=config["contrast"],
@@ -208,6 +201,14 @@ def get_transform(
 
     transform_list.append(transforms.ToTensor())
     transform_list.append(transforms.Normalize(mean=mean, std=std))
+
+    if config:
+        transform_list.append(transforms.RandomApply(
+                [
+                    torchvision.transforms.v2.GaussianNoise(mean=config["random_gaussian_noise_mean"],sigma=config["random_gaussian_noise_std"])
+                ],
+                p=config["random_gaussian_noise_prob"]
+            ))
 
     return transforms.Compose(transform_list)
 
