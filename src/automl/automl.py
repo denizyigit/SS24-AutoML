@@ -165,6 +165,9 @@ def target_function(**config):
             device=device
         )
 
+        print(
+            f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}, Validation Loss: {validation_loss}")
+
         # Check if early stopping is needed
         early_stopping(validation_loss)
 
@@ -175,9 +178,8 @@ def target_function(**config):
         if config["scheduler"] == "reduceLROnPlateau":
             scheduler.step(validation_loss)
 
-        print(
-            f"PID_{config['pid']}: Epoch {epoch + 1}, Training Loss: {training_loss}, Validation Loss: {validation_loss}")
-
+        # Update the best_validation_loss of current config
+        # In the end, we will return best_validation_loss as the loss of the current config
         if (best_validation_loss is None or validation_loss < best_validation_loss):
             best_validation_loss = validation_loss
 
