@@ -9,11 +9,12 @@ to a file, which we will grade using github classrooms!
 from __future__ import annotations
 
 from pathlib import Path
-from sklearn.metrics import top_k_accuracy_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, top_k_accuracy_score
 import numpy as np
 from src.automl.automl import AutoML
 import argparse
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 import logging
 
 
@@ -25,37 +26,63 @@ def main(
         output_path: Path,
         seed: int,
         reduced_dataset_ratio: float,
-        # max_evaluations_total: int
+        max_evaluations_total: int,
+        max_epochs: int,
+        num_process: int
 ):
     logger.info("Fitting AutoML")
 
-    # You do not need to follow this setup or API it's merely here to provide
-    # an example of how your automl system could be used.
-    # As a general rule of thumb, you should **never** pass in any
-    # test data to your AutoML solution other than to generate predictions.
-    automl = AutoML(seed=seed, dataset=dataset,
-                    reduced_dataset_ratio=reduced_dataset_ratio)
-    # load the dataset and create a loader then pass it
+    # Create an instance of the AutoML class
+    automl = AutoML(
+        seed=seed,
+        dataset=dataset,
+        reduced_dataset_ratio=reduced_dataset_ratio,
+        max_evaluations_total=max_evaluations_total,
+        max_epochs=max_epochs,
+        num_process=num_process
+    )
+
+    # Start automation pipeline to find the best configuration and train a model with it
     automl.fit()
-    # Do the same for the test dataset
+
+    # Get the predictions of the test set from the best model (You must have run automl.fit() before this)
     test_preds, test_labels = automl.predict()
 
     # Write the predictions of X_test to disk
-    # This will be used by github classrooms to get a performance
-    # on the test set.
     logger.info("Writing predictions to disk")
     with output_path.open("wb") as f:
         np.save(f, test_preds)
 
-    # check if test_labels has missing data
-
+    # Calculate the top-1 and top-5 accuracy score of the model on the test set
     if not np.isnan(test_labels).any():
         acc_top_1 = top_k_accuracy_score(test_labels, test_preds, k=1)
         acc_top_5 = top_k_accuracy_score(test_labels, test_preds, k=5)
 
-        print(f"test labels length: {len(test_labels)}")
+        print(f"Test labels length: {len(test_labels)}")
         logger.info(f"Top 1 Accuracy on test set: {acc_top_1}")
         logger.info(f"Top 5 Accuracy on test set: {acc_top_5}")
+
+        test_preds_labels = np.argmax(test_preds, axis=1)
+        conf_matrix = confusion_matrix(test_labels, test_preds_labels)
+        logger.info(f"Confusion Matrix:\n{conf_matrix}")
+
+        # Precision, Recall, and F1-Score
+        precision = precision_score(
+            test_labels, test_preds_labels, average='macro')
+        recall = recall_score(test_labels, test_preds_labels, average='macro')
+        f1 = f1_score(test_labels, test_preds_labels, average='macro')
+
+        logger.info(f"Precision: {precision}")
+        logger.info(f"Recall: {recall}")
+        logger.info(f"F1 Score: {f1}")
+
+        # Plotting Confusion Matrix
+        plt.figure(figsize=(10, 7))
+        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+        plt.xlabel('Predicted')
+        plt.ylabel('True')
+        plt.title('Confusion Matrix')
+        plt.show()
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         logger.info(f"No test split for dataset '{dataset}'")
@@ -104,7 +131,25 @@ if __name__ == "__main__":
         type=int,
         default=10,
         help=(
-            "Nubmer of configs to evaluate in total."
+            "Total number of configurations to select & evaluate during model training. Default is 10."
+        )
+    )
+
+    parser.add_argument(
+        "--max_epochs",
+        type=int,
+        default=15,
+        help=(
+            "Maximum number of epochs (budget) to train the model for with a selected configuration. Default is 15."
+        )
+    )
+
+    parser.add_argument(
+        "--num-process",
+        type=int,
+        default=1,
+        help=(
+            "Number of configs processes to run neps.run() in parallel. Default is 1."
         )
     )
 
@@ -131,5 +176,7 @@ if __name__ == "__main__":
         output_path=args.output_path,
         seed=args.seed,
         reduced_dataset_ratio=args.reduced_dataset_ratio,
-        # max_evaluations_total=args.max_evaluations_total
+        max_evaluations_total=args.max_evaluations_total,
+        max_epochs=args.max_epochs,
+        num_process=args.num_process
     )

@@ -282,7 +282,7 @@ def neps_run_pipeline_multiprocessor(num_process: int, seed: int, dataset: str, 
 
 class AutoML:
 
-    def __init__(self, seed: int, dataset: str, reduced_dataset_ratio: float = 1.0, max_evaluations_total=10) -> None:
+    def __init__(self, seed: int, dataset: str, reduced_dataset_ratio: float, max_evaluations_total: int,  max_epochs: int, num_process: int) -> None:
         self.seed = seed
 
         self.best_model: nn.Module | None = None
