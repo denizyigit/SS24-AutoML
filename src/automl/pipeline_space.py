@@ -33,22 +33,22 @@ class PipelineSpace:
             lower=0.0, upper=1.0, default=0.5, default_confidence="medium")
         self.random_vertical_flip_prob = neps.Float(
             lower=0.0, upper=1.0, default=0.5, default_confidence="low")
-        self.random_rotation_deg = neps.Integer(
-            lower=0, upper=180, default=90, default_confidence="low")
-        self.random_rotation_prob = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
-        self.random_gaussian_noise_mean = neps.Float(
-            lower=0.0, upper=1.0, default=0.0, default_confidence="medium")
-        self.random_gaussian_noise_std = neps.Float(
-            lower=0.0, upper=1.0, default=0.1, default_confidence="low")
-        self.random_gaussian_noise_prob = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
-        self.brightness = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
-        self.contrast = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
-        self.saturation = neps.Float(
-            lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+        # self.random_rotation_deg = neps.Integer(
+        #     lower=0, upper=180, default=90, default_confidence="low")
+        # self.random_rotation_prob = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+        # self.random_gaussian_noise_mean = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.0, default_confidence="medium")
+        # self.random_gaussian_noise_std = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.1, default_confidence="low")
+        # self.random_gaussian_noise_prob = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+        # self.brightness = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+        # self.contrast = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.5, default_confidence="low")
+        # self.saturation = neps.Float(
+        #     lower=0.0, upper=1.0, default=0.5, default_confidence="low")
 
     def get_pipeline_space(self, pid, seed,  dataset, reduced_dataset_ratio, max_epochs):
         return {
@@ -72,12 +72,12 @@ class PipelineSpace:
             "weight_dec_sgd": self.weight_dec_sgd,
             "random_horizontal_flip_prob": self.random_horizontal_flip_prob,
             "random_vertical_flip_prob": self.random_vertical_flip_prob,
-            "random_rotation_deg": self.random_rotation_deg,
-            "random_rotation_prob": self.random_rotation_prob,
-            "random_gaussian_noise_mean": self.random_gaussian_noise_mean,
-            "random_gaussian_noise_std": self.random_gaussian_noise_std,
-            "random_gaussian_noise_prob": self.random_gaussian_noise_prob,
-            "brightness": self.brightness,
-            "contrast": self.contrast,
-            "saturation": self.saturation,
+            # "random_rotation_deg": self.random_rotation_deg,
+            # "random_rotation_prob": self.random_rotation_prob,
+            # "random_gaussian_noise_mean": self.random_gaussian_noise_mean,
+            # "random_gaussian_noise_std": self.random_gaussian_noise_std,
+            # "random_gaussian_noise_prob": self.random_gaussian_noise_prob,
+            # "brightness": self.brightness,
+            # "contrast": self.contrast,
+            # "saturation": self.saturation,
         }

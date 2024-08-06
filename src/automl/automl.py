@@ -60,13 +60,14 @@ def target_function(**config):
         root="./data",
         split='train',
         download=True,
-        transform=transforms.ToTensor() if dataset_class.channels == 3 else
-        transforms.Compose(
-            [
-                GrayscaleToRGB(),
-                transforms.ToTensor()
-            ]
-        ),
+        transform=transforms.ToTensor()
+        # if dataset_class.channels == 3 else
+        # transforms.Compose(
+        #     [
+        #         GrayscaleToRGB(),
+        #         transforms.ToTensor()
+        #     ]
+        # ),
     )
 
     # Reduce dataset size if needed for faster training
@@ -125,13 +126,13 @@ def target_function(**config):
     # TODO: Implement a more sophisticated acrhitecture selection with respect to the pipeline_space (for the sake of NAS)
     # See https://github.com/automl/neps/blob/master/neps_examples/basic_usage/architecture_and_hyperparameters.py
 
-    model = MobileNet(output_channels=dataset_class.num_classes)
-    # model = DummyCNN(
-    #     input_channels=dataset_class.channels,
-    #     hidden_channels=30,
-    #     output_channels=dataset_class.num_classes,
-    #     image_width=dataset_class.width
-    # )
+    # model = MobileNet(output_channels=dataset_class.num_classes)
+    model = DummyCNN(
+        input_channels=dataset_class.channels,
+        hidden_channels=30,
+        output_channels=dataset_class.num_classes,
+        image_width=dataset_class.width
+    )
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -382,13 +383,13 @@ class AutoML:
         train_loader = DataLoader(
             dataset_train, batch_size=int(self.best_config["batch_size"]), shuffle=True)
 
-        model = MobileNet(output_channels=dataset_class.num_classes)
-        # model = DummyCNN(
-        #     input_channels=dataset_class.channels,
-        #     hidden_channels=30,
-        #     output_channels=dataset_class.num_classes,
-        #     image_width=dataset_class.width
-        # )
+        # model = MobileNet(output_channels=dataset_class.num_classes)
+        model = DummyCNN(
+            input_channels=dataset_class.channels,
+            hidden_channels=30,
+            output_channels=dataset_class.num_classes,
+            image_width=dataset_class.width
+        )
         model.to(self.device)
 
         criterion = nn.CrossEntropyLoss()

@@ -30,12 +30,12 @@ install:
 run:
 	export TF_CPP_MIN_LOG_LEVEL=2 && \
 	python run.py \
-		--dataset emotions \
+		--dataset $(dataset) \
 		--seed 42 \
-		--output-path preds-42-emotions.npy \
+		--output-path preds-42-$(dataset).npy \
 		--reduced-dataset-ratio 0.1 \
-		--max-evaluations-total 18
-		--max_epochs 15
+		--max-evaluations-total 18 \
+		--max-epochs 15 \
 		--num-process 1
 
 check:
