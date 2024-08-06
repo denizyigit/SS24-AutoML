@@ -205,7 +205,7 @@ def get_transform(
     if config:
         transform_list.append(transforms.RandomApply(
                 [
-                    torchvision.transforms.v2.GaussianNoise(mean=config["random_gaussian_noise_mean"],sigma=config["random_gaussian_noise_std"])
+                    AddGaussianNoise(config["random_gaussian_noise_mean"],config["random_gaussian_noise_std"])
                 ],
                 p=config["random_gaussian_noise_prob"]
             ))
