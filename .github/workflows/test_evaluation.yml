@@ -1,0 +1,62 @@
+name: Run Model Evaluation on Test Data
+
+on:
+    push:
+        branches:
+            - test
+
+    workflow_dispatch:
+
+jobs:
+    test-data-evaluation:
+        runs-on: ubuntu-latest
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.MRAZMARTIN_EXAM_EVAL }}
+    
+        steps:
+            - name: Checkout Student Repository
+              uses: actions/checkout@v2
+              with:
+                path: student-repo
+
+            - name: Checkout Evaluation Repository
+              uses: actions/checkout@v2
+              with:
+                repository: ${{ vars.EVAL_REPO }}
+                token: ${{ secrets.MRAZMARTIN_EXAM_EVAL }}
+                path: eval-repo
+            
+            - name: Setup Python
+              uses: actions/setup-python@v2
+              with:
+                python-version: '3.9'
+            
+            - name: Install Dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install scikit-learn
+
+            - name: Run Evaluation
+              run: |
+                timestamp=$(date +%Y-%m-%d_%H-%M)
+                output_file="test_evaluation_output_$timestamp.json"
+                python eval-repo/test_evaluate.py --pred_path student-repo/data/exam_dataset/predictions.npy --type vision --output_path student-repo/data/exam_dataset/test_out/$output_file
+           
+
+            - name: Commit Test Output
+              working-directory: student-repo
+              run: |
+                git config --global user.name "github-actions[bot]"
+                git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                git add data/exam_dataset/test_out/test_evaluation_output_*.json
+                git commit -m "Add test output ${{ github.run_id }}"
+                git push
+
+            - name: Display Evaluation Results
+              working-directory: student-repo
+              run: |
+                echo "Evaluation Results:"
+                latest_file=$(ls -t ./data/exam_dataset/test_out | head -n 1)
+                cat ./data/exam_dataset/test_out/$latest_file
+            
