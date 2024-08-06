@@ -83,11 +83,13 @@ def main(
         test_preds_labels = np.argmax(test_preds, axis=1)
 
         # Plot confusion matrix
-        class_names = range(get_dataset_class(dataset).num_classes)
-        cm = confusion_matrix(test_labels, test_preds_labels, labels=class_names)
-        plot_confusion_matrix(cm, class_names)
-        logger.info(
-            f"Confusion matrix saved to {'confusion_matrix.png'}")
+        if dataset == "emotions":
+            #class_names = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+            class_names = range(get_dataset_class(dataset).num_classes)
+            cm = confusion_matrix(test_labels, test_preds_labels, labels=class_names)
+            plot_confusion_matrix(cm, class_names)
+            logger.info(
+                f"Confusion matrix saved to {'confusion_matrix.png'}")
 
         # Precision, Recall, and F1-Score
         precision = precision_score(
